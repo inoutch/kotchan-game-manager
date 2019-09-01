@@ -7,6 +7,7 @@ import io.github.inoutch.kotchan.game.extension.checkClass
 import io.github.inoutch.kotchan.game.extension.filterIsInstance
 import io.github.inoutch.kotchan.game.component.store.Store
 import io.github.inoutch.kotchan.game.error.*
+import io.github.inoutch.kotchan.game.extension.fastForEach
 import io.github.inoutch.kotchan.game.util.ContextProvider
 import kotlin.math.min
 import kotlin.native.concurrent.ThreadLocal
@@ -53,6 +54,9 @@ class ComponentManager {
     private val invListeners = mutableMapOf<ComponentLifecycleListener<*>, KClass<Component>>()
 
     private val pureListeners = mutableListOf<ComponentLifecycleListener<Component>>()
+
+    // subscription
+    private val invSubscriptions = mutableMapOf<ComponentLifecycleListener<*>, String>()
 
     private var activated: (() -> Unit)? = null
 
@@ -115,6 +119,15 @@ class ComponentManager {
         waitingComponentStores.addAll(stores.toMutableList())
     }
 
+    fun <T : Component> subscribe(id: String, componentClass: KClass<T>, listener: ComponentLifecycleListener<T>) {
+        findByIdForLocal(id, componentClass)?.addLifecycleListener(listener)
+        invSubscriptions[listener] = id
+    }
+
+    fun <T : Component> unsubscribe(listener: ComponentLifecycleListener<T>) {
+        findByIdForLocal(invSubscriptions.getValue(listener), Component::class)?.removeLifecycleListener(listener)
+    }
+
     fun activateComponent(id: String) {
         val store = waitingComponentStores.find { it.id == id }
         if (store != null) {
@@ -156,6 +169,8 @@ class ComponentManager {
 
     @Suppress("UNCHECKED_CAST")
     fun <T : Component> unregisterComponentListener(listener: ComponentLifecycleListener<T>) {
+        checkNotNull(this.invListeners[listener])
+
         this.listeners.remove(this.invListeners[listener] as KClass<Component>)
         this.invListeners.remove(listener)
         this.pureListeners.remove(listener as ComponentLifecycleListener<Component>)
@@ -194,9 +209,14 @@ class ComponentManager {
         this.updateWillDestroyComponents()
     }
 
+    fun reserveComponentDestruction(id: String) {
+        val component = findById(id, Component::class) ?: return
+        reserveComponentDestruction(component)
+    }
+
     fun reserveComponentDestruction(component: Component) {
-        component.lifecycle = ComponentLifecycle.WILL_DESTROY
         changeLifecycle(component, ComponentLifecycle.WILL_DESTROY)
+        component.lifecycle = ComponentLifecycle.WILL_DESTROY
 
         // Reserve destruction of child components
         this.componentsByLabels[component.id]?.forEach { reserveComponentDestruction(it) }
@@ -232,7 +252,7 @@ class ComponentManager {
 
         // Attach to labels
         val parentId = component.parentId
-        if (parentId != null) {
+        if (parentId.isNotBlank()) {
             this.componentsByLabels
                     .getOrPut(parentId) { mutableListOf() }
                     .add(component)
@@ -250,8 +270,14 @@ class ComponentManager {
         this.components.remove(component.id)
 
         // Detach from labels
-        this.componentsByLabels[component.id]?.remove(component)
-        component.labels.forEach { this.componentsByLabels[it]?.remove(component) }
+        this.componentsByLabels.remove(component.id)
+        component.labels.fastForEach {
+            val components = this.componentsByLabels[it] ?: return@fastForEach
+            components.remove(component)
+            if (components.isEmpty()) {
+                this.componentsByLabels.remove(it)
+            }
+        }
 
         // Detach from lifecycle
         val targets = this.componentsByLifecycle.getValue(component.lifecycle)
@@ -263,6 +289,7 @@ class ComponentManager {
 
         // Set lifecycle
         component.lifecycle = ComponentLifecycle.DESTROYED
+        component.destroyed()
     }
 
     private fun changeLifecycle(from: ComponentLifecycle, to: ComponentLifecycle) {
@@ -280,7 +307,7 @@ class ComponentManager {
 
     private fun changeLifecycle(component: Component, to: ComponentLifecycle) {
         val from = component.lifecycle
-        this.componentsByLifecycle.getValue(component.lifecycle).remove(component)
+        this.componentsByLifecycle.getValue(from).remove(component)
         component.lifecycle = to
         this.componentsByLifecycle.getValue(to).add(component)
 

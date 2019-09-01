@@ -40,9 +40,10 @@ abstract class ComponentGroup<T : Component>(
         return ComponentAccessor.create(component)
     }
 
-    override fun create() {}
-
-    override fun update(delta: Float) {}
+    override fun destroyed() {
+        super.destroyed()
+        componentManager.unregisterComponentListener(this)
+    }
 
     override fun create(component: T) {
         component.checkClass(kClass)?.let { this.components.add(it) }
@@ -50,9 +51,5 @@ abstract class ComponentGroup<T : Component>(
 
     override fun destroyed(component: T) {
         this.components.remove(component)
-    }
-
-    override fun destroyed() {
-        componentManager.unregisterComponentListener(this)
     }
 }

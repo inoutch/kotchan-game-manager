@@ -4,7 +4,6 @@ import io.github.inoutch.kotchan.game.component.ComponentManager.Companion.compo
 import io.github.inoutch.kotchan.game.component.ComponentManager.Companion.contextProvider
 import io.github.inoutch.kotchan.game.component.store.Store
 import io.github.inoutch.kotchan.game.error.ERR_V_MSG_0
-import io.github.inoutch.kotchan.game.error.ERR_V_MSG_1
 import io.github.inoutch.kotchan.game.error.ERR_V_MSG_2
 import io.github.inoutch.kotchan.game.extension.fastForEach
 
@@ -13,7 +12,7 @@ abstract class Component {
 
     val id = store.id
 
-    val parentId: String?
+    val parentId: String
         get() = store.parentId
 
     val labels: List<String>
@@ -64,8 +63,6 @@ abstract class Component {
 
     protected inline fun <reified T : Component> parent(): T {
         check(lifecycle != ComponentLifecycle.CREATE) { ERR_V_MSG_0 }
-
-        val parentId = parentId ?: throw IllegalStateException(ERR_V_MSG_1)
-        return componentManager.findById<T>(parentId, T::class)?.raw ?: throw IllegalStateException(ERR_V_MSG_2)
+        return componentManager.findById(parentId, T::class)?.raw ?: throw IllegalStateException(ERR_V_MSG_2)
     }
 }

@@ -132,136 +132,11 @@ class ComponentManagerTest {
                 }
             }
         }
-    }
 
-    @Test
-    fun checkAccessor() {
-        val componentId = componentManager.createComponent(CustomNoUpdateStore("test"))
-        assertNotNull(componentId)
-
-        val component = componentManager.findById(componentId, CustomNoUpdateComponent::class)
-        assertNotNull(component)
-
-        var access = ""
-
-        assertEquals(ComponentLifecycle.CREATE, component.lifecycle)
-        component.access { l, _ ->
-            access = when (l) {
-                ComponentLifecycle.CREATE -> "create"
-                ComponentLifecycle.UPDATE -> "update"
-                else -> "error"
-            }
-        }
-        assertEquals("create", access)
-
-        assertEquals(ComponentLifecycle.CREATE, component.lifecycle)
-        component.access { l, _ ->
-            access = when (l) {
-                ComponentLifecycle.CREATE -> "create"
-                ComponentLifecycle.UPDATE -> "update"
-                else -> "error"
-            }
-        }
-        assertEquals("create", access)
-
+        componentManager.reserveComponentDestruction(children)
         componentManager.update(Mock.DELTA_TIME)
 
-        assertEquals(ComponentLifecycle.UPDATE, component.lifecycle)
-        component.access { l, _ ->
-            access = when (l) {
-                ComponentLifecycle.CREATE -> "create"
-                ComponentLifecycle.UPDATE -> "update"
-                else -> "error"
-            }
-        }
-        assertEquals("update", access)
-
-        componentManager.reserveComponentDestruction(component)
-
-        assertEquals(ComponentLifecycle.WILL_DESTROY, component.lifecycle)
-        component.access { l, _ ->
-            access = when (l) {
-                ComponentLifecycle.CREATE -> "create"
-                ComponentLifecycle.UPDATE -> "update"
-                ComponentLifecycle.WILL_DESTROY -> "update"
-                else -> "error"
-            }
-        }
-        assertEquals("update", access)
-
-        componentManager.update(Mock.DELTA_TIME)
-
-        assertEquals(ComponentLifecycle.DESTROYED, component.lifecycle)
-        component.access { l, _ ->
-            access = when (l) {
-                ComponentLifecycle.CREATE -> "create"
-                ComponentLifecycle.UPDATE -> "update"
-                ComponentLifecycle.DESTROYED -> "destroy"
-                else -> "error"
-            }
-        }
-        assertEquals("destroy", access)
-    }
-
-    @Test
-    fun checkToUpdateComponent() {
-        val componentId = componentManager.createComponent(CustomNoUpdateStore("test"))
-        assertNotNull(componentId)
-
-        val component = componentManager.findById(componentId, CustomNoUpdateComponent::class)
-        assertNotNull(component)
-
-        assertEquals(ComponentLifecycle.CREATE, component.lifecycle)
-        component.access { l, c ->
-            when (l) {
-                ComponentLifecycle.CREATE -> {
-                    assertEquals("none", c.status)
-                }
-                else -> {
-                }
-            }
-        }
-
-        componentManager.update(Mock.DELTA_TIME)
-
-        assertEquals(ComponentLifecycle.UPDATE, component.lifecycle)
-        component.access { l, c ->
-            when (l) {
-                ComponentLifecycle.UPDATE -> {
-                    assertEquals("created", c.status)
-                }
-                else -> {
-                }
-            }
-        }
-    }
-
-    @Test
-    fun checkToAccessChildComponent() {
-        val parentId = componentManager.createComponent(CustomStore("test"))
-        assertNotNull(parentId)
-
-        val parent = componentManager.findById(parentId, CustomComponent::class)
-        assertNotNull(parent)
-
-        val childId = componentManager.createComponent(CustomChildStore("test"), parentId)
-        assertNotNull(childId)
-
-        val child = componentManager.findById(childId, CustomChildComponent::class)
-        assertNotNull(child)
-
-        assertEquals(ComponentLifecycle.CREATE, child.lifecycle)
-        componentManager.update(Mock.DELTA_TIME)
-
-        child.access { l, c ->
-            when (l) {
-                ComponentLifecycle.CREATE -> {
-                    assertNotNull(parentId, c.component.id)
-                }
-                else -> {
-                }
-            }
-        }
+        assertEquals(0, componentManager.componentSize)
     }
 
     @Test
@@ -292,5 +167,38 @@ class ComponentManagerTest {
 
         val customComponent2 = componentManager.findById(customComponentId, CustomChildComponent::class)
         assertNull(customComponent2)
+    }
+
+    @Test
+    fun checkSubscription() {
+        val customComponentId = componentManager.createComponent(CustomStore("ABC"))
+        assertNotNull(customComponentId)
+
+        var status = "none"
+        val listener = object : ComponentLifecycleListener<CustomComponent> {
+            override fun create(component: CustomComponent) {
+                status = "create"
+            }
+
+            override fun destroyed(component: CustomComponent) {
+                status = "destroyed"
+            }
+        }
+
+        componentManager.subscribe(customComponentId, CustomComponent::class, listener)
+
+        assertEquals("none", status)
+
+        componentManager.update(Mock.DELTA_TIME)
+
+        assertEquals("create", status)
+
+        componentManager.reserveComponentDestruction(customComponentId)
+
+        assertEquals("create", status)
+
+        componentManager.update(Mock.DELTA_TIME)
+
+        assertEquals("destroyed", status)
     }
 }

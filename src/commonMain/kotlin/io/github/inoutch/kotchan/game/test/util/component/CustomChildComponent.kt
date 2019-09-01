@@ -6,15 +6,7 @@ class CustomChildComponent : Component() {
     lateinit var component: CustomComponent
 
     override fun create() {
+        super.create()
         component = parent()
-    }
-
-    override fun update(delta: Float) {
-    }
-
-    override fun willDestroy() {
-    }
-
-    override fun destroyed() {
     }
 }

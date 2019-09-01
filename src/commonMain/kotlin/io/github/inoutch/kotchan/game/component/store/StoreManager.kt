@@ -41,7 +41,7 @@ class StoreManager {
 
     fun store(): String {
         val stores = componentManager.writeStores()
-                .filter { it.factoryType != null }
+                .filter { it.factoryType.isNotBlank() }
 
         return json.stringify(RootStore.serializer(), RootStore(stores.map { StoreWrapper(it) }))
     }

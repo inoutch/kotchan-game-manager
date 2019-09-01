@@ -9,7 +9,7 @@ open class ComponentGroupByLabel<T : Component>(
         components: List<T>) : ComponentGroup<T>(filterClass, components.filter { filter(it, label) }) {
     companion object {
         private fun filter(component: Component, label: String): Boolean {
-            return component.parentId?.equals(label) == true || component.labels.contains(label)
+            return component.parentId == label || component.labels.contains(label)
         }
     }
 
