@@ -16,6 +16,6 @@ class Custom1EventFactorRunner : EventFactorRunner<Custom1EventFactor, CustomCom
     }
 
     override fun end() {
-        component.raw.state = "event-start"
+        component.raw.state = "event-end"
     }
 }

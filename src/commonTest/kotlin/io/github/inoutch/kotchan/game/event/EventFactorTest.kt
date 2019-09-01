@@ -16,7 +16,7 @@ class EventFactorTest {
 
     @Test
     fun serialization() {
-        val factor = Custom1EventFactor()
+        val factor = Custom1EventFactor(500)
         val eventRuntime = EventRuntime(123, "test", factor, 456)
 
         val bytes = eventManager.dump(eventRuntime)

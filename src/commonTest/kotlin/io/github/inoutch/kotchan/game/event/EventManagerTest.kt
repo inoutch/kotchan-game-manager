@@ -9,9 +9,9 @@ import io.github.inoutch.kotchan.game.test.util.event.Custom1EventFactor
 import io.github.inoutch.kotchan.game.test.util.event.Custom1EventCreator
 import io.github.inoutch.kotchan.game.test.util.event.Custom1EventCreatorRunnerFactory
 import io.github.inoutch.kotchan.game.test.util.event.Custom1EventFactorRunnerFactory
-import io.github.inoutch.kotchan.game.util.Mock
 import kotlin.test.BeforeTest
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 
 class EventManagerTest {
@@ -38,12 +38,22 @@ class EventManagerTest {
         val component = componentManager.findById(componentId, CustomComponent::class)
         assertNotNull(component)
 
-        eventManager.update(Mock.DELTA_TIME)
-
         eventManager.enqueue(componentId, Custom1EventCreator())
 
-        eventManager.update(Mock.DELTA_TIME)
+        eventManager.update(0.0f)
 
-        eventManager.update(Mock.DELTA_TIME)
+        assertEquals("event-update", component.raw.state)
+
+        eventManager.update(0.499f)
+
+        assertEquals("event-update", component.raw.state)
+
+        eventManager.update(0.001f)
+
+        assertEquals("event-end", component.raw.state)
+
+        eventManager.update(0.001f)
+
+        assertEquals("event-update", component.raw.state)
     }
 }

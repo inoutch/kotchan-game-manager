@@ -8,6 +8,6 @@ class Custom1EventCreatorRunner : EventCreatorRunner<Custom1EventCreator, Custom
         Custom1EventCreator::class,
         CustomComponent::class) {
     override fun next(builder: EventBuilder) {
-        builder.enqueue(Custom1EventFactor())
+        builder.enqueue(Custom1EventFactor(500))
     }
 }

@@ -19,14 +19,17 @@ class EventManager {
         val contextProvider = ContextProvider<EventRuntime>()
     }
 
-    class EventFactoryContext(
+    class EventCreatorContext(
             var runningEventFactors: Int,
             var endTime: Long,
             val eventQueue: MutableList<Event>) {
         constructor() : this(0, 0, mutableListOf())
     }
 
-    private val eventCreators = mutableMapOf<String, EventFactoryContext>()
+    val eventCreatorSize: Int
+        get() = eventCreators.values.size
+
+    private val eventCreators = mutableMapOf<String, EventCreatorContext>()
 
     private val eventCreatorsToStart = arrayListOf<EventCreatorRunner<*, *>>()
 
@@ -60,7 +63,7 @@ class EventManager {
         val factory = eventFactorFactories[event.factoryClass]
         checkNotNull(factory) { ERR_F_MSG_2(event.factoryClass, factory) }
 
-        val context = eventCreators.getOrPut(componentId) { EventFactoryContext() }
+        val context = eventCreators.getOrPut(componentId) { EventCreatorContext() }
         if (context.endTime < time) {
             context.endTime = time
         }
@@ -72,7 +75,7 @@ class EventManager {
     }
 
     fun enqueue(componentId: String, event: EventCreator) {
-        val context = eventCreators.getOrPut(componentId) { EventFactoryContext() }
+        val context = eventCreators.getOrPut(componentId) { EventCreatorContext() }
         context.eventQueue.add(event)
 
         if (context.runningEventFactors == 0) {
@@ -82,6 +85,7 @@ class EventManager {
 
     fun enqueue(componentId: String, event: EventFactorEnd) {
         val context = eventCreators.getValue(componentId)
+        check(event == context.eventQueue.first())
         context.eventQueue.removeAt(0)
 
         if (context.eventQueue.isEmpty()) {
@@ -110,10 +114,11 @@ class EventManager {
     fun update(delta: Float) {
         time += (delta * 1000.0f).toLong()
 
+        executeEventCreators()
+
         cleanUpEvents()
         processEvents()
         updateEvents()
-        executeEventCreators()
     }
 
     fun dump(eventRuntime: EventRuntime): ByteArray {
@@ -190,6 +195,7 @@ class EventManager {
             val componentId = x.component.raw.id
             val context = eventCreators.getValue(componentId)
             context.runningEventFactors -= 1
+            context.eventQueue.removeAt(0)
 
             // If event factors is not queued, queue event to start
             if (context.runningEventFactors == 0) {
