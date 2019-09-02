@@ -23,7 +23,7 @@ fun ERR_F_MSG_1(expected: String, actual: ComponentFactory?) =
 fun ERR_F_MSG_2(expected: String, actual: EventFactorRunnerFactory?) =
         "EventFactorRunnerFactory is not registered [expected: $expected, actual: ${actual?.let { className(it::class) }}]"
 
-fun <T: Component>ERR_F_MSG_3(expected: KClass<T>) =
+fun <T : Component> ERR_F_MSG_3(expected: KClass<T>) =
         "Not found or invalid component [expected: $expected]"
 
 fun ERR_F_MSG_4(expected: String, actual: EventCreatorRunnerFactory?) =

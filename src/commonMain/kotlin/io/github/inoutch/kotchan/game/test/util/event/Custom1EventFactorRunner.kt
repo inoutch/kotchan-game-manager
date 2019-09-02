@@ -8,14 +8,14 @@ class Custom1EventFactorRunner : EventFactorRunner<Custom1EventFactor, CustomCom
         CustomComponent::class) {
 
     override fun start() {
-        component.raw.state = "event-start"
+        component.raw.states.add("event-start")
     }
 
     override fun update(ratio: Float) {
-        component.raw.state = "event-update"
+        component.raw.states.add("event-update")
     }
 
     override fun end() {
-        component.raw.state = "event-end"
+        component.raw.states.add("event-end")
     }
 }

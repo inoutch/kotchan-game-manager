@@ -20,14 +20,15 @@ class EventManager {
     }
 
     class EventCreatorContext(
-            var runningEventFactors: Int,
-            var endTime: Long,
-            val eventQueue: MutableList<Event>) {
-        constructor() : this(0, 0, mutableListOf())
-    }
+            var runningEventFactors: Int = 0,
+            var endTime: Long = 0,
+            val eventQueue: MutableList<Event> = mutableListOf())
 
     val eventCreatorSize: Int
         get() = eventCreators.values.size
+
+    val eventFactorSize: Int
+        get() = eventsSortedByEndTime.size
 
     private val eventCreators = mutableMapOf<String, EventCreatorContext>()
 
@@ -85,14 +86,9 @@ class EventManager {
 
     fun enqueue(componentId: String, event: EventFactorEnd) {
         val context = eventCreators.getValue(componentId)
-        check(event == context.eventQueue.first())
         context.eventQueue.removeAt(0)
 
-        if (context.eventQueue.isEmpty()) {
-            // Clean up
-            eventCreators.remove(componentId)
-            return
-        }
+        executeToStartEvent(componentId, context)
     }
 
     fun registerEventFactorRunnerFactory(eventFactorRunnerFactory: EventFactorRunnerFactory) {
@@ -114,11 +110,12 @@ class EventManager {
     fun update(delta: Float) {
         time += (delta * 1000.0f).toLong()
 
+        cleanUpEvents()
+        updateEvents()
+
         executeEventCreators()
 
-        cleanUpEvents()
         processEvents()
-        updateEvents()
     }
 
     fun dump(eventRuntime: EventRuntime): ByteArray {
@@ -246,14 +243,21 @@ class EventManager {
 
             // Add events on the head
             context.eventQueue.addAll(0, builder.eventQueue)
+            executeToStartEvent(componentId, context)
+        }
+    }
 
-            val first = builder.eventQueue.first()
-            if (first is EventCreator) {
-                // If first event is event create, append event creator to start
+    private fun executeToStartEvent(componentId: String, context: EventCreatorContext) {
+        when (val first = context.eventQueue.firstOrNull()) {
+            null -> {
+                eventCreators.remove(componentId)
+            }
+            is EventCreator -> {
                 eventCreatorsToStart.add(createEventCreatorRunner(componentId, first))
-            } else if (first is EventFactor) {
+            }
+            is EventFactor -> {
                 // Else if first event is event factor, append event factors until an event creator
-                for (x in builder.eventQueue) {
+                for (x in context.eventQueue) {
                     if (x is EventFactor) {
                         enqueue(componentId, x)
                     } else if (x is EventCreator) {

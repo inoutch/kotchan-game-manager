@@ -5,16 +5,14 @@ import io.github.inoutch.kotchan.game.event.EventManager.Companion.eventManager
 import io.github.inoutch.kotchan.game.test.util.component.CustomComponent
 import io.github.inoutch.kotchan.game.test.util.component.CustomComponentFactory
 import io.github.inoutch.kotchan.game.test.util.component.store.CustomStore
-import io.github.inoutch.kotchan.game.test.util.event.Custom1EventFactor
-import io.github.inoutch.kotchan.game.test.util.event.Custom1EventCreator
-import io.github.inoutch.kotchan.game.test.util.event.Custom1EventCreatorRunnerFactory
-import io.github.inoutch.kotchan.game.test.util.event.Custom1EventFactorRunnerFactory
+import io.github.inoutch.kotchan.game.test.util.event.*
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
 
 class EventManagerTest {
+    private lateinit var component: CustomComponent
+
     @BeforeTest
     fun init() {
         componentManager.destroyAllComponents()
@@ -28,32 +26,56 @@ class EventManagerTest {
         }
         eventManager.registerEventCreatorRunnerFactory(Custom1EventCreatorRunnerFactory())
         eventManager.registerEventFactorRunnerFactory(Custom1EventFactorRunnerFactory())
+        eventManager.registerEventCreatorRunnerFactory(Custom2EventCreatorRunnerFactory())
+
+        val componentId = componentManager.createComponent(CustomStore("test"))
+                ?: throw IllegalStateException("Could not create componentId")
+
+        component = componentManager.findById(componentId, CustomComponent::class)?.raw
+                ?: throw IllegalStateException("Could not create component")
     }
 
     @Test
-    fun update() {
-        val componentId = componentManager.createComponent(CustomStore("test"))
-        assertNotNull(componentId)
+    fun createEventCreator() {
+        val expectStates = mutableListOf("event-start")
 
-        val component = componentManager.findById(componentId, CustomComponent::class)
-        assertNotNull(component)
-
-        eventManager.enqueue(componentId, Custom1EventCreator())
+        eventManager.enqueue(component.id, Custom1EventCreator())
 
         eventManager.update(0.0f)
 
-        assertEquals("event-update", component.raw.state)
+        assertEquals(expectStates, component.states)
 
         eventManager.update(0.499f)
 
-        assertEquals("event-update", component.raw.state)
+        expectStates.add("event-update")
+        assertEquals(expectStates, component.states)
 
         eventManager.update(0.001f)
 
-        assertEquals("event-end", component.raw.state)
+        expectStates.addAll(listOf("event-end", "event-start"))
+        assertEquals(expectStates, component.states)
 
         eventManager.update(0.001f)
 
-        assertEquals("event-update", component.raw.state)
+        expectStates.addAll(listOf("event-update"))
+        assertEquals(expectStates, component.states)
+
+        // Result
+        assertEquals(1, eventManager.eventCreatorSize)
+        assertEquals(1, eventManager.eventFactorSize)
+    }
+
+    @Test
+    fun childEventCreator() {
+        val expectStates = mutableListOf("event-start")
+
+        eventManager.enqueue(component.id, Custom2EventCreator("test2"))
+
+        eventManager.update(0.0f)
+        assertEquals(expectStates, component.states)
+
+        eventManager.update(0.099f)
+        expectStates.add("event-update")
+        assertEquals(expectStates, component.states)
     }
 }

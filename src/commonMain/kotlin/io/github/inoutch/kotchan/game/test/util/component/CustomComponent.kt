@@ -12,6 +12,10 @@ class CustomComponent : Component() {
 
     var ratio = 0.0f
 
+    val states = mutableListOf<String>()
+
+    var increment = 0
+
     override fun create() {
         super.create()
         state = "created"
