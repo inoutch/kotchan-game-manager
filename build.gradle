@@ -38,6 +38,7 @@ apply plugin: "maven-publish"
 kotlin {
     jvm()
     macosX64()
+    linuxX64()
     iosArm64("ios")
     android {
         publishLibraryVariants("release")
@@ -79,6 +80,16 @@ kotlin {
             }
         }
         macosX64Test {
+            dependencies {
+                implementation "org.jetbrains.kotlin:kotlin-test:$kotlin_version"
+            }
+        }
+        linuxX64Main {
+            dependencies {
+                implementation "org.jetbrains.kotlinx:kotlinx-serialization-runtime-native:$kotlin_serialization_version"
+            }
+        }
+        linuxX64Test {
             dependencies {
                 implementation "org.jetbrains.kotlin:kotlin-test:$kotlin_version"
             }
