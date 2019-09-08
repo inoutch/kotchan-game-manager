@@ -22,6 +22,7 @@ class EventManager {
     class EventCreatorContext(
             var runningEventFactors: Int = 0,
             var endTime: Long = 0,
+            // All events queue
             val eventQueue: MutableList<Event> = mutableListOf())
 
     val eventCreatorSize: Int
@@ -58,21 +59,6 @@ class EventManager {
 
         unregisterAllEventFactorRunnerFactories()
         unregisterAllEventCreatorRunnerFactories()
-    }
-
-    fun enqueue(componentId: String, event: EventFactor) {
-        val factory = eventFactorFactories[event.factoryClass]
-        checkNotNull(factory) { ERR_F_MSG_2(event.factoryClass, factory) }
-
-        val context = eventCreators.getOrPut(componentId) { EventCreatorContext() }
-        if (context.endTime < time) {
-            context.endTime = time
-        }
-        eventsSortedByStartTime.add(contextProvider.run(EventRuntime(idManager.nextId(), componentId, event, context.endTime)) {
-            factory.create()
-        })
-        context.endTime += event.durationTime
-        context.runningEventFactors += 1
     }
 
     fun enqueue(componentId: String, event: EventCreator) {
@@ -142,6 +128,21 @@ class EventManager {
         updateEventRunners.remove(eventFactorRunner)
     }
 
+    private fun startEventFactor(componentId: String, event: EventFactor) {
+        val factory = eventFactorFactories[event.factoryClass]
+        checkNotNull(factory) { ERR_F_MSG_2(event.factoryClass, factory) }
+
+        val context = eventCreators.getOrPut(componentId) { EventCreatorContext() }
+        if (context.endTime < time) {
+            context.endTime = time
+        }
+        eventsSortedByStartTime.add(contextProvider.run(EventRuntime(idManager.nextId(), componentId, event, context.endTime)) {
+            factory.create()
+        })
+        context.endTime += event.durationTime
+        context.runningEventFactors += 1
+    }
+
     private fun createEventCreatorRunner(componentId: String, event: EventCreator): EventCreatorRunner<*, *> {
         val factory = eventCreatorFactories[event.factoryClass]
         checkNotNull(factory) { ERR_F_MSG_4(event.factoryClass, factory) }
@@ -194,30 +195,26 @@ class EventManager {
             context.runningEventFactors -= 1
             context.eventQueue.removeAt(0)
 
-            // If event factors is not queued, queue event to start
-            if (context.runningEventFactors == 0) {
-                val event = context.eventQueue.firstOrNull()
-                if (event != null) {
-                    when (event) {
-                        is EventFactor -> {
-                            enqueue(componentId, event)
-                        }
-                        is EventCreator -> {
-                            eventCreatorsToStart.add(createEventCreatorRunner(componentId, event))
-                        }
-                    }
-                    // Remove event factor from queue
-                    context.eventQueue.removeAt(0)
-                } else {
-                    eventCreators.remove(componentId)
-                }
-            }
             // Notify end event factor
             x.end()
             x.isEnded = true
             if (x.updatable) {
                 updateEventRunners.remove(x)
             }
+
+            if (context.runningEventFactors != 0) {
+                continue
+            }
+
+            // If event factors is not queued, queue event to start
+            val event = context.eventQueue.firstOrNull()
+            if (event == null) {
+                eventCreators.remove(componentId)
+                continue
+            }
+
+            check(event is EventCreator) { ERR_V_MSG_7 }
+            eventCreatorsToStart.add(createEventCreatorRunner(componentId, event))
         }
     }
 
@@ -259,7 +256,7 @@ class EventManager {
                 // Else if first event is event factor, append event factors until an event creator
                 for (x in context.eventQueue) {
                     if (x is EventFactor) {
-                        enqueue(componentId, x)
+                        startEventFactor(componentId, x)
                     } else if (x is EventCreator) {
                         break
                     } else throw IllegalStateException(ERR_V_MSG_6)

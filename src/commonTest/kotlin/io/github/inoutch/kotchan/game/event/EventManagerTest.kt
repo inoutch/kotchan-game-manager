@@ -77,5 +77,32 @@ class EventManagerTest {
         eventManager.update(0.099f)
         expectStates.add("event-update")
         assertEquals(expectStates, component.states)
+
+        eventManager.update(0.001f)
+        expectStates.addAll(listOf("event-end", "event-start"))
+        assertEquals(expectStates, component.states)
+
+        eventManager.update(0.099f)
+        expectStates.add("event-update")
+        assertEquals(expectStates, component.states)
+
+        eventManager.update(0.001f)
+        expectStates.addAll(listOf("event-end", "event-start"))
+        assertEquals(expectStates, component.states)
+
+        eventManager.update(0.099f)
+        expectStates.add("event-update")
+        assertEquals(expectStates, component.states)
+
+        eventManager.update(0.001f)
+        expectStates.addAll(listOf("event-end"))
+        assertEquals(expectStates, component.states)
+
+        eventManager.update(0.001f)
+        assertEquals(expectStates, component.states)
+
+        // Result
+        assertEquals(0, eventManager.eventCreatorSize)
+        assertEquals(0, eventManager.eventFactorSize)
     }
 }

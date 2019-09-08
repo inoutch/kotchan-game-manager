@@ -13,6 +13,7 @@ const val ERR_V_MSG_2 = "Invalid parent id"
 const val ERR_V_MSG_4 = "Activated callback is not registered"
 const val ERR_V_MSG_5 = "Factory type is null"
 const val ERR_V_MSG_6 = "Invalid event"
+const val ERR_V_MSG_7 = "Only event factors"
 
 fun ERR_F_MSG_0(expected: KClass<*>, actual: KClass<*>) =
         "Invalid access of store [expected: ${className(expected)}, actual: ${className(actual)}]"
