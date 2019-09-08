@@ -23,7 +23,7 @@ class EventManager {
             var runningEventFactors: Int = 0,
             var endTime: Long = 0,
             // All events queue
-            val eventQueue: MutableList<Event> = mutableListOf())
+            val eventStoreQueue: MutableList<EventStore> = mutableListOf())
 
     val eventCreatorSize: Int
         get() = eventCreators.values.size
@@ -33,18 +33,18 @@ class EventManager {
 
     private val eventCreators = mutableMapOf<String, EventCreatorContext>()
 
-    private val eventCreatorsToStart = arrayListOf<EventCreatorRunner<*, *>>()
+    private val eventCreatorsToStart = arrayListOf<EventCreator<*, *>>()
 
-    private val eventsSortedByStartTime = arrayListOf<EventFactorRunner<*, *>>()
+    private val eventsSortedByStartTime = arrayListOf<EventReducer<*, *>>()
 
-    private val eventsSortedByEndTime = arrayListOf<EventFactorRunner<*, *>>()
+    private val eventsSortedByEndTime = arrayListOf<EventReducer<*, *>>()
 
-    private val updateEventRunners = mutableListOf<EventFactorRunner<*, *>>()
+    private val updateEventRunners = mutableListOf<EventReducer<*, *>>()
 
     // <KClass string, factory>
-    private val eventFactorFactories = mutableMapOf<String, EventFactorRunnerFactory>()
+    private val eventFactorFactories = mutableMapOf<String, EventReducerFactory>()
 
-    private val eventCreatorFactories = mutableMapOf<String, EventCreatorRunnerFactory>()
+    private val eventCreatorFactories = mutableMapOf<String, EventCreatorFactory>()
 
     private val idManager = IdManager()
 
@@ -57,33 +57,39 @@ class EventManager {
         val module = SerializersModule(registerCallback)
         serializer = ProtoBuf(context = module)
 
+        eventCreators.clear()
+        eventCreatorsToStart.clear()
+        eventsSortedByStartTime.clear()
+        eventsSortedByEndTime.clear()
+        updateEventRunners.clear()
+
         unregisterAllEventFactorRunnerFactories()
         unregisterAllEventCreatorRunnerFactories()
     }
 
-    fun enqueue(componentId: String, event: EventCreator) {
+    fun enqueue(componentId: String, eventStore: EventCreatorStore) {
         val context = eventCreators.getOrPut(componentId) { EventCreatorContext() }
-        context.eventQueue.add(event)
+        context.eventStoreQueue.add(eventStore)
 
         if (context.runningEventFactors == 0) {
-            eventCreatorsToStart.add(createEventCreatorRunner(componentId, event))
+            eventCreatorsToStart.add(createEventCreatorRunner(componentId, eventStore))
         }
     }
 
     @Suppress("UNUSED_PARAMETER")
-    fun enqueue(componentId: String, event: EventFactorEnd) {
+    fun enqueue(componentId: String, event: EventReducerStoreEnd) {
         val context = eventCreators.getValue(componentId)
-        context.eventQueue.removeAt(0)
+        context.eventStoreQueue.removeAt(0)
 
         executeToStartEvent(componentId, context)
     }
 
-    fun registerEventFactorRunnerFactory(eventFactorRunnerFactory: EventFactorRunnerFactory) {
-        eventFactorFactories[className(eventFactorRunnerFactory::class)] = eventFactorRunnerFactory
+    fun registerEventFactorRunnerFactory(eventReducerFactory: EventReducerFactory) {
+        eventFactorFactories[className(eventReducerFactory::class)] = eventReducerFactory
     }
 
-    fun registerEventCreatorRunnerFactory(eventCreatorRunnerFactory: EventCreatorRunnerFactory) {
-        eventCreatorFactories[className(eventCreatorRunnerFactory::class)] = eventCreatorRunnerFactory
+    fun registerEventCreatorRunnerFactory(eventCreatorFactory: EventCreatorFactory) {
+        eventCreatorFactories[className(eventCreatorFactory::class)] = eventCreatorFactory
     }
 
     fun unregisterAllEventFactorRunnerFactories() {
@@ -113,23 +119,23 @@ class EventManager {
         return serializer.load(EventRuntime.serializer(), bytes)
     }
 
-    fun attachUpdatable(eventFactorRunner: EventFactorRunner<*, *>) {
-        if (eventFactorRunner.isEnded) {
+    fun attachUpdatable(eventReducer: EventReducer<*, *>) {
+        if (eventReducer.isEnded) {
             // Ignore
             return
         }
-        updateEventRunners.add(eventFactorRunner)
+        updateEventRunners.add(eventReducer)
     }
 
-    fun detachUpdatable(eventFactorRunner: EventFactorRunner<*, *>) {
-        if (eventFactorRunner.isEnded) {
+    fun detachUpdatable(eventReducer: EventReducer<*, *>) {
+        if (eventReducer.isEnded) {
             // Ignore
             return
         }
-        updateEventRunners.remove(eventFactorRunner)
+        updateEventRunners.remove(eventReducer)
     }
 
-    private fun startEventFactor(componentId: String, event: EventFactor) {
+    private fun startEventFactor(componentId: String, event: EventReducerStore) {
         val factory = eventFactorFactories[event.factoryClass]
         checkNotNull(factory) { ERR_F_MSG_2(event.factoryClass, factory) }
 
@@ -144,18 +150,18 @@ class EventManager {
         context.runningEventFactors += 1
     }
 
-    private fun createEventCreatorRunner(componentId: String, event: EventCreator): EventCreatorRunner<*, *> {
-        val factory = eventCreatorFactories[event.factoryClass]
-        checkNotNull(factory) { ERR_F_MSG_4(event.factoryClass, factory) }
+    private fun createEventCreatorRunner(componentId: String, eventStore: EventCreatorStore): EventCreator<*, *> {
+        val factory = eventCreatorFactories[eventStore.factoryClass]
+        checkNotNull(factory) { ERR_F_MSG_4(eventStore.factoryClass, factory) }
 
-        return contextProvider.run(EventRuntime(idManager.nextId(), componentId, event, time)) { factory.create() }
+        return contextProvider.run(EventRuntime(idManager.nextId(), componentId, eventStore, time)) { factory.create() }
     }
 
     private fun ratio(eventRuntime: EventRuntime): Float {
-        if (eventRuntime.event !is EventFactor) {
+        if (eventRuntime.eventStore !is EventReducerStore) {
             return 0.0f
         }
-        return min(((time - eventRuntime.startTime).toDouble() / eventRuntime.event.durationTime).toFloat(), 1.0f)
+        return min(((time - eventRuntime.startTime).toDouble() / eventRuntime.eventStore.durationTime).toFloat(), 1.0f)
     }
 
     private fun updateEvents() {
@@ -194,7 +200,7 @@ class EventManager {
             val componentId = x.component.raw.id
             val context = eventCreators.getValue(componentId)
             context.runningEventFactors -= 1
-            context.eventQueue.removeAt(0)
+            context.eventStoreQueue.removeAt(0)
 
             // Notify end event factor
             x.end()
@@ -208,13 +214,13 @@ class EventManager {
             }
 
             // If event factors is not queued, queue event to start
-            val event = context.eventQueue.firstOrNull()
+            val event = context.eventStoreQueue.firstOrNull()
             if (event == null) {
                 eventCreators.remove(componentId)
                 continue
             }
 
-            check(event is EventCreator) { ERR_V_MSG_7 }
+            check(event is EventCreatorStore) { ERR_V_MSG_7 }
             eventCreatorsToStart.add(createEventCreatorRunner(componentId, event))
         }
     }
@@ -233,32 +239,32 @@ class EventManager {
             val builder = EventBuilder()
             eventCreatorRunner.next(builder)
 
-            if (builder.eventQueue.isEmpty()) {
+            if (builder.eventStoreQueue.isEmpty()) {
                 // No enqueue more events
-                enqueue(componentId, EventFactorEnd())
+                enqueue(componentId, EventReducerStoreEnd())
                 continue
             }
 
             // Add events on the head
-            context.eventQueue.addAll(0, builder.eventQueue)
+            context.eventStoreQueue.addAll(0, builder.eventStoreQueue)
             executeToStartEvent(componentId, context)
         }
     }
 
     private fun executeToStartEvent(componentId: String, context: EventCreatorContext) {
-        when (val first = context.eventQueue.firstOrNull()) {
+        when (val first = context.eventStoreQueue.firstOrNull()) {
             null -> {
                 eventCreators.remove(componentId)
             }
-            is EventCreator -> {
+            is EventCreatorStore -> {
                 eventCreatorsToStart.add(createEventCreatorRunner(componentId, first))
             }
-            is EventFactor -> {
+            is EventReducerStore -> {
                 // Else if first event is event factor, append event factors until an event creator
-                for (x in context.eventQueue) {
-                    if (x is EventFactor) {
+                for (x in context.eventStoreQueue) {
+                    if (x is EventReducerStore) {
                         startEventFactor(componentId, x)
-                    } else if (x is EventCreator) {
+                    } else if (x is EventCreatorStore) {
                         break
                     } else throw IllegalStateException(ERR_V_MSG_6)
                 }
@@ -266,9 +272,9 @@ class EventManager {
         }
     }
 
-    private fun pullStartingEvents(): List<EventFactorRunner<*, *>> {
+    private fun pullStartingEvents(): List<EventReducer<*, *>> {
         var index = 0
-        val buffers = mutableListOf<EventFactorRunner<*, *>>()
+        val buffers = mutableListOf<EventReducer<*, *>>()
 
         while (index < eventsSortedByStartTime.size) {
             val buffer = eventsSortedByStartTime[index++]
@@ -284,9 +290,9 @@ class EventManager {
         return buffers
     }
 
-    private fun pullEndingEvents(): List<EventFactorRunner<*, *>> {
+    private fun pullEndingEvents(): List<EventReducer<*, *>> {
         var index = 0
-        val buffers = arrayListOf<EventFactorRunner<*, *>>()
+        val buffers = arrayListOf<EventReducer<*, *>>()
 
         while (index < eventsSortedByEndTime.size) {
             val buffer = eventsSortedByEndTime[index++]

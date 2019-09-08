@@ -6,8 +6,8 @@ import kotlinx.serialization.Serializable
 data class EventRuntime(
         val id: Long,
         val componentId: String,
-        val event: Event,
+        val eventStore: EventStore,
         val startTime: Long) {
     val endTime: Long
-        get() = startTime + if (event is EventFactor) event.durationTime else 0
+        get() = startTime + if (eventStore is EventReducerStore) eventStore.durationTime else 0
 }

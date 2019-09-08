@@ -10,7 +10,7 @@ import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-class EventManagerTest {
+class EventStoreManagerTest {
     private lateinit var component: CustomComponent
 
     @BeforeTest
@@ -20,13 +20,13 @@ class EventManagerTest {
         componentManager.registerComponentFactory(CustomComponentFactory())
 
         eventManager.init {
-            polymorphic(Event::class) {
-                Custom1EventFactor::class with Custom1EventFactor.serializer()
+            polymorphic(EventStore::class) {
+                Custom1EventReducerStore::class with Custom1EventReducerStore.serializer()
             }
         }
-        eventManager.registerEventCreatorRunnerFactory(Custom1EventCreatorRunnerFactory())
-        eventManager.registerEventFactorRunnerFactory(Custom1EventFactorRunnerFactory())
-        eventManager.registerEventCreatorRunnerFactory(Custom2EventCreatorRunnerFactory())
+        eventManager.registerEventCreatorRunnerFactory(Custom1EventCreatorFactory())
+        eventManager.registerEventFactorRunnerFactory(Custom1EventReducerFactory())
+        eventManager.registerEventCreatorRunnerFactory(Custom2EventCreatorFactory())
 
         val componentId = componentManager.createComponent(CustomStore("test"))
                 ?: throw IllegalStateException("Could not create componentId")
@@ -39,7 +39,7 @@ class EventManagerTest {
     fun createEventCreator() {
         val expectStates = mutableListOf("event-start")
 
-        eventManager.enqueue(component.id, Custom1EventCreator())
+        eventManager.enqueue(component.id, Custom1EventCreatorStore())
 
         eventManager.update(0.0f)
 
@@ -69,7 +69,7 @@ class EventManagerTest {
     fun childEventCreator() {
         val expectStates = mutableListOf("event-start")
 
-        eventManager.enqueue(component.id, Custom2EventCreator("test2"))
+        eventManager.enqueue(component.id, Custom2EventCreatorStore("test2"))
 
         eventManager.update(0.0f)
         assertEquals(expectStates, component.states)

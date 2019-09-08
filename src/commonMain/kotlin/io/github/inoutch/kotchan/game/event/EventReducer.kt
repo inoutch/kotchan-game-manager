@@ -3,18 +3,17 @@ package io.github.inoutch.kotchan.game.event
 import io.github.inoutch.kotchan.game.component.Component
 import io.github.inoutch.kotchan.game.component.ComponentManager.Companion.componentManager
 import io.github.inoutch.kotchan.game.error.ERR_F_MSG_3
-import io.github.inoutch.kotchan.game.error.ERR_V_MSG_4
 import io.github.inoutch.kotchan.game.event.EventManager.Companion.contextProvider
 import io.github.inoutch.kotchan.game.event.EventManager.Companion.eventManager
 import kotlin.reflect.KClass
 
-abstract class EventFactorRunner<T : Event, U : Component>(
+abstract class EventReducer<T : EventStore, U : Component>(
         val eventClass: KClass<T>,
-        val componentClass: KClass<U>) : EventRunner {
+        val componentClass: KClass<U>) : Event {
 
     val eventRuntime = contextProvider.current
 
-    val eventFactor = eventRuntime.event as EventFactor
+    val eventFactor = eventRuntime.eventStore as EventReducerStore
 
     val component = componentManager.findById(eventRuntime.componentId, componentClass)
             ?: throw IllegalStateException(ERR_F_MSG_3(componentClass))

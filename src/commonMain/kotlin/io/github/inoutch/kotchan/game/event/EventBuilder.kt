@@ -1,18 +1,18 @@
 package io.github.inoutch.kotchan.game.event
 
 class EventBuilder {
-    val eventQueue: List<Event>
+    val eventStoreQueue: List<EventStore>
         get() = events
 
-    private val events = mutableListOf<Event>()
+    private val events = mutableListOf<EventStore>()
 
-    private var current: Event? = null
+    private var current: EventStore? = null
 
-    fun enqueue(event: Event) {
-        if (current is EventFactor && event is EventCreator) {
-            events.add(EventFactorEnd())
+    fun enqueue(eventStore: EventStore) {
+        if (current is EventReducerStore && eventStore is EventCreatorStore) {
+            events.add(EventReducerStoreEnd())
         }
 
-        events.add(event)
+        events.add(eventStore)
     }
 }

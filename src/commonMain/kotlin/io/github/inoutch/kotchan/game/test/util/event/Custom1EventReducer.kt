@@ -1,10 +1,10 @@
 package io.github.inoutch.kotchan.game.test.util.event
 
-import io.github.inoutch.kotchan.game.event.EventFactorRunner
+import io.github.inoutch.kotchan.game.event.EventReducer
 import io.github.inoutch.kotchan.game.test.util.component.CustomComponent
 
-class Custom1EventFactorRunner : EventFactorRunner<Custom1EventFactor, CustomComponent>(
-        Custom1EventFactor::class,
+class Custom1EventReducer : EventReducer<Custom1EventReducerStore, CustomComponent>(
+        Custom1EventReducerStore::class,
         CustomComponent::class) {
 
     override fun start() {

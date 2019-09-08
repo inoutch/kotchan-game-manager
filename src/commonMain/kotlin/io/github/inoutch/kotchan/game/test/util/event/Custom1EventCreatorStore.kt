@@ -1,12 +1,11 @@
 package io.github.inoutch.kotchan.game.test.util.event
 
-import io.github.inoutch.kotchan.game.event.EventFactor
+import io.github.inoutch.kotchan.game.event.EventCreatorStore
 import io.github.inoutch.kotchan.game.extension.className
 import kotlinx.serialization.Serializable
 
 @Serializable
-class Custom1EventFactor(override val durationTime: Long) : EventFactor() {
-
+class Custom1EventCreatorStore : EventCreatorStore() {
     override val factoryClass: String
-        get() = className(Custom1EventFactorRunnerFactory::class)
+        get() = className(Custom1EventCreatorFactory::class)
 }

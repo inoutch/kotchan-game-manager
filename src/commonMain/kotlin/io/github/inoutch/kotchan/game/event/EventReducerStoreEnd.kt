@@ -1,6 +1,6 @@
 package io.github.inoutch.kotchan.game.event
 
-class EventFactorEnd : EventFactor() {
+class EventReducerStoreEnd : EventReducerStore() {
     override val durationTime = 0L
     override val factoryClass = ""
 }
