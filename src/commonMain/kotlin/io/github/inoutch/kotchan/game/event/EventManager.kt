@@ -70,6 +70,7 @@ class EventManager {
         }
     }
 
+    @Suppress("UNUSED_PARAMETER")
     fun enqueue(componentId: String, event: EventFactorEnd) {
         val context = eventCreators.getValue(componentId)
         context.eventQueue.removeAt(0)
