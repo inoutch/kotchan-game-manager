@@ -37,6 +37,8 @@ abstract class EventReducer<T : EventStore, U : Component>(
 
     var isEnded = false
 
+    open fun interrupt() = false
+
     abstract fun start()
 
     abstract fun update(ratio: Float)

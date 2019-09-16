@@ -19,6 +19,11 @@ class EventManager {
         val contextProvider = ContextProvider<EventRuntime>()
     }
 
+    enum class Mode {
+        Server,
+        Client,
+    }
+
     class EventCreatorContext(
             var runningEventFactors: Int = 0,
             var endTime: Long = 0,
@@ -53,6 +58,10 @@ class EventManager {
     // Serialization
     private lateinit var serializer: ProtoBuf
 
+    private var eventTransfer: EventTransfer? = null
+
+    private var mode: Mode = Mode.Server
+
     fun init(registerCallback: SerializersModuleBuilder.() -> Unit) {
         val module = SerializersModule(registerCallback)
         serializer = ProtoBuf(context = module)
@@ -67,29 +76,17 @@ class EventManager {
         unregisterAllEventCreatorRunnerFactories()
     }
 
-    fun enqueue(componentId: String, eventStore: EventCreatorStore) {
-        val context = eventCreators.getOrPut(componentId) { EventCreatorContext() }
-        context.eventStoreQueue.add(eventStore)
-
-        if (context.runningEventFactors == 0) {
-            eventCreatorsToStart.add(createEventCreatorRunner(componentId, eventStore))
-        }
-    }
-
-    @Suppress("UNUSED_PARAMETER")
-    fun enqueue(componentId: String, event: EventReducerStoreEnd) {
-        val context = eventCreators.getValue(componentId)
-        context.eventStoreQueue.removeAt(0)
-
-        executeToStartEvent(componentId, context)
-    }
-
+    //---- For common
     fun registerEventFactorRunnerFactory(eventReducerFactory: EventReducerFactory) {
         eventFactorFactories[className(eventReducerFactory::class)] = eventReducerFactory
     }
 
     fun registerEventCreatorRunnerFactory(eventCreatorFactory: EventCreatorFactory) {
         eventCreatorFactories[className(eventCreatorFactory::class)] = eventCreatorFactory
+    }
+
+    fun registerEventTransfer(eventTransfer: EventTransfer) {
+        this.eventTransfer = eventTransfer
     }
 
     fun unregisterAllEventFactorRunnerFactories() {
@@ -103,12 +100,13 @@ class EventManager {
     fun update(delta: Float) {
         time += (delta * 1000.0f).toLong()
 
-        cleanUpEvents()
+        endEventReducers()
+
         updateEvents()
 
-        executeEventCreators()
+        startEventCreators()
 
-        processEvents()
+        startEventReducers()
     }
 
     fun dump(eventRuntime: EventRuntime): ByteArray {
@@ -135,28 +133,6 @@ class EventManager {
         updateEventRunners.remove(eventReducer)
     }
 
-    private fun startEventFactor(componentId: String, event: EventReducerStore) {
-        val factory = eventFactorFactories[event.factoryClass]
-        checkNotNull(factory) { ERR_F_MSG_2(event.factoryClass, factory) }
-
-        val context = eventCreators.getOrPut(componentId) { EventCreatorContext() }
-        if (context.endTime < time) {
-            context.endTime = time
-        }
-        eventsSortedByStartTime.add(contextProvider.run(EventRuntime(idManager.nextId(), componentId, event, context.endTime)) {
-            factory.create()
-        })
-        context.endTime += event.durationTime
-        context.runningEventFactors += 1
-    }
-
-    private fun createEventCreatorRunner(componentId: String, eventStore: EventCreatorStore): EventCreator<*, *> {
-        val factory = eventCreatorFactories[eventStore.factoryClass]
-        checkNotNull(factory) { ERR_F_MSG_4(eventStore.factoryClass, factory) }
-
-        return contextProvider.run(EventRuntime(idManager.nextId(), componentId, eventStore, time)) { factory.create() }
-    }
-
     private fun ratio(eventRuntime: EventRuntime): Float {
         if (eventRuntime.eventStore !is EventReducerStore) {
             return 0.0f
@@ -168,7 +144,57 @@ class EventManager {
         updateEventRunners.fastForEach { it.update(ratio(it.eventRuntime)) }
     }
 
-    private fun processEvents() {
+    //---- For server
+    // Server only
+    fun enqueue(componentId: String, eventStore: EventCreatorStore) {
+        val context = eventCreators.getOrPut(componentId) { EventCreatorContext() }
+        context.eventStoreQueue.add(eventStore)
+
+        if (context.runningEventFactors == 0) {
+            eventCreatorsToStart.add(createEventCreator(componentId, eventStore))
+        }
+    }
+
+    private fun createEventCreator(componentId: String, eventStore: EventCreatorStore): EventCreator<*, *> {
+        val factory = eventCreatorFactories[eventStore.factoryClass]
+        checkNotNull(factory) { ERR_F_MSG_4(eventStore.factoryClass, factory) }
+
+        return contextProvider.run(EventRuntime(idManager.nextId(), componentId, eventStore, time)) { factory.create() }
+    }
+
+    private fun startEventReducer(componentId: String, event: EventReducerStore) {
+        val factory = eventFactorFactories[event.factoryClass]
+        checkNotNull(factory) { ERR_F_MSG_2(event.factoryClass, factory) }
+
+        val context = eventCreators.getOrPut(componentId) { EventCreatorContext() }
+        if (context.endTime < time) {
+            context.endTime = time
+        }
+
+        val eventRuntime = contextProvider.run(EventRuntime(
+                idManager.nextId(),
+                componentId,
+                event,
+                context.endTime)) { factory.create() }
+
+        eventsSortedByStartTime.add(eventRuntime)
+        context.endTime += event.durationTime
+        context.runningEventFactors += 1
+    }
+
+    @Suppress("UNUSED_PARAMETER")
+    private fun startEventReducerEnd(componentId: String, event: EventReducerStoreEnd) {
+        val context = eventCreators.getValue(componentId)
+        context.eventStoreQueue.removeAt(0)
+
+        startEventCreator(componentId, context)
+    }
+
+    private fun startEventReducers() {
+        if (mode != Mode.Server) {
+            return
+        }
+
         val events = pullStartingEvents()
         if (events.isEmpty()) {
             return
@@ -190,7 +216,11 @@ class EventManager {
         eventsSortedByEndTime.sortBy { it.endTime }
     }
 
-    private fun cleanUpEvents() {
+    private fun endEventReducers() {
+        if (mode != Mode.Server) {
+            return
+        }
+
         val events = pullEndingEvents()
         if (events.isEmpty()) {
             return
@@ -221,11 +251,15 @@ class EventManager {
             }
 
             check(event is EventCreatorStore) { ERR_V_MSG_7 }
-            eventCreatorsToStart.add(createEventCreatorRunner(componentId, event))
+            eventCreatorsToStart.add(createEventCreator(componentId, event))
         }
     }
 
-    private fun executeEventCreators() {
+    private fun startEventCreators() {
+        if (mode != Mode.Server) {
+            return
+        }
+
         // DO NOT PROCESSING BY CLIENT
         while (eventCreatorsToStart.isNotEmpty()) {
             // Pick up event creator runner
@@ -241,29 +275,29 @@ class EventManager {
 
             if (builder.eventStoreQueue.isEmpty()) {
                 // No enqueue more events
-                enqueue(componentId, EventReducerStoreEnd())
+                startEventReducerEnd(componentId, EventReducerStoreEnd())
                 continue
             }
 
             // Add events on the head
             context.eventStoreQueue.addAll(0, builder.eventStoreQueue)
-            executeToStartEvent(componentId, context)
+            startEventCreator(componentId, context)
         }
     }
 
-    private fun executeToStartEvent(componentId: String, context: EventCreatorContext) {
+    private fun startEventCreator(componentId: String, context: EventCreatorContext) {
         when (val first = context.eventStoreQueue.firstOrNull()) {
             null -> {
                 eventCreators.remove(componentId)
             }
             is EventCreatorStore -> {
-                eventCreatorsToStart.add(createEventCreatorRunner(componentId, first))
+                eventCreatorsToStart.add(createEventCreator(componentId, first))
             }
             is EventReducerStore -> {
                 // Else if first event is event factor, append event factors until an event creator
                 for (x in context.eventStoreQueue) {
                     if (x is EventReducerStore) {
-                        startEventFactor(componentId, x)
+                        startEventReducer(componentId, x)
                     } else if (x is EventCreatorStore) {
                         break
                     } else throw IllegalStateException(ERR_V_MSG_6)
@@ -306,5 +340,15 @@ class EventManager {
             eventsSortedByEndTime.removeAt(0)
         }
         return buffers
+    }
+
+    //---- For client
+    fun receive(eventRuntime: EventRuntime) {
+        if (mode != Mode.Client) {
+            return
+        }
+
+        val context = eventCreators.getOrPut(eventRuntime.componentId) { EventCreatorContext() }
+        context.eventStoreQueue.add(eventRuntime.eventStore)
     }
 }
