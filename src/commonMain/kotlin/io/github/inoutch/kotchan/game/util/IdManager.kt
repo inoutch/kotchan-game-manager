@@ -4,4 +4,8 @@ class IdManager {
     private var nextId = 0L
 
     fun nextId() = nextId++
+
+    fun reset() {
+        nextId = 0
+    }
 }

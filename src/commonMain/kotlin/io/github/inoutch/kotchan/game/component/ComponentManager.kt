@@ -45,7 +45,7 @@ class ComponentManager {
 
     private var waitingComponents = mutableListOf<Component>()
 
-    // factoryType, component factory
+    // factoryClass, component factory
     private val factories = mutableMapOf<String, ComponentFactory>()
 
     // listeners
@@ -146,11 +146,11 @@ class ComponentManager {
     }
 
     fun registerComponentFactory(factory: ComponentFactory) {
-        val factoryType = className(factory::class)
-        if (this.factories[factoryType] != null) {
-            throw Error("factory is already existed: factoryType is $factoryType")
+        val factoryClass = className(factory::class)
+        if (this.factories[factoryClass] != null) {
+            throw Error("factory is already existed: factoryClass is $factoryClass")
         }
-        factories[factoryType] = factory
+        factories[factoryClass] = factory
     }
 
     fun unregisterComponentFactory(factoryClass: KClass<*>) {
