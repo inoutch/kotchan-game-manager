@@ -3,6 +3,7 @@ package io.github.inoutch.kotchan.game.event
 import io.github.inoutch.kotchan.game.error.*
 import io.github.inoutch.kotchan.game.extension.className
 import io.github.inoutch.kotchan.game.extension.fastForEach
+import io.github.inoutch.kotchan.game.network.Mode
 import io.github.inoutch.kotchan.game.util.ContextProvider
 import io.github.inoutch.kotchan.game.util.IdManager
 import kotlinx.serialization.modules.SerializersModule
@@ -17,11 +18,6 @@ class EventManager {
         val eventManager = EventManager()
 
         val contextProvider = ContextProvider<EventRuntime>()
-    }
-
-    enum class Mode {
-        Server,
-        Client,
     }
 
     class EventCreatorContext(
