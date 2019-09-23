@@ -8,12 +8,13 @@ import io.github.inoutch.kotchan.game.extension.className
 import kotlin.reflect.KClass
 
 const val ERR_V_MSG_0 = "Parent may be not created yet. Do not access parent before CREATE"
-const val ERR_V_MSG_1 = "Parent id is null"
+const val ERR_V_MSG_1 = "Invalid class of ActionRuntimeStore"
 const val ERR_V_MSG_2 = "Invalid parent id"
 const val ERR_V_MSG_4 = "Activated callback is not registered"
 const val ERR_V_MSG_5 = "Factory type is null"
-const val ERR_V_MSG_6 = "Invalid event"
-const val ERR_V_MSG_7 = "Only event factors"
+const val ERR_V_MSG_6 = "Client only operation"
+const val ERR_V_MSG_7 = "Invalid action was received"
+const val ERR_V_MSG_8 = "ActionNode is not registered by id"
 
 fun ERR_F_MSG_0(expected: KClass<*>, actual: KClass<*>) =
         "Invalid access of actionStore [expected: ${className(expected)}, actual: ${className(actual)}]"

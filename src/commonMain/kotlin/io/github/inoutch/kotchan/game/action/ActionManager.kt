@@ -2,13 +2,17 @@ package io.github.inoutch.kotchan.game.action
 
 import io.github.inoutch.kotchan.game.action.event.*
 import io.github.inoutch.kotchan.game.action.task.*
+import io.github.inoutch.kotchan.game.error.*
 import io.github.inoutch.kotchan.game.extension.className
+import io.github.inoutch.kotchan.game.extension.fastForEach
+import io.github.inoutch.kotchan.game.network.Mode
 import io.github.inoutch.kotchan.game.network.NetworkInterface
 import io.github.inoutch.kotchan.game.util.ContextProvider
 import io.github.inoutch.kotchan.game.util.IdManager
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.SerializersModuleBuilder
 import kotlinx.serialization.protobuf.ProtoBuf
+import kotlin.math.min
 import kotlin.native.concurrent.ThreadLocal
 
 class ActionManager {
@@ -23,7 +27,7 @@ class ActionManager {
 
     private val contexts = mutableMapOf<String, ActionComponentContext>() // Group by componentId
 
-    private val nodes = mutableMapOf<Long, ActionNode>() // Registered all nodes
+    private val nodeMap = mutableMapOf<Long, ActionNode>() // Registered all nodeMap
 
     private val runtimeActionIdManager = IdManager() // Incremental id manager
 
@@ -34,12 +38,16 @@ class ActionManager {
 
     private val eventRunnersSortedByEndTime = arrayListOf<EventRunner<*, *>>()
 
+    private val updateEventRunners = mutableListOf<EventRunner<*, *>>()
+
     // Factories
     private val eventRunnerFactories = mutableMapOf<String, EventRunnerFactory>()
 
     private val taskRunnerFactories = mutableMapOf<String, TaskRunnerFactory>()
 
     // Network
+    private var mode = Mode.Server
+
     private var networkInterface: NetworkInterface? = null
 
     // Serialization
@@ -50,7 +58,7 @@ class ActionManager {
         serializer = ProtoBuf(context = module)
 
         contexts.clear()
-        nodes.clear()
+        nodeMap.clear()
         runtimeActionIdManager.reset()
 
         unregisterAllTaskRunnerFactories()
@@ -84,11 +92,11 @@ class ActionManager {
                 store = actionRuntimeStore.taskStore
                 createTaskRunner(actionRuntimeStore)
             }
-            else -> TODO()
+            else -> throw IllegalStateException(ERR_V_MSG_1)
         }
 
-        val parent = nodes[actionRuntimeStore.parentId]
-        val actionNode = ActionNode(store, parent, runner)
+        val parent = nodeMap[actionRuntimeStore.parentId]
+        val actionNode = ActionNode(runner.componentId, store, parent, runner)
 
         if (parent != null) {
             // 親の要素に子を登録
@@ -103,13 +111,16 @@ class ActionManager {
             contexts[runner.componentId] = ActionComponentContext(actionNode)
         }
 
-        nodes[runner.id] = actionNode
+        nodeMap[runner.id] = actionNode
     }
 
     fun receiveInterrupt(id: Long) {
-        val runner = nodes[id]?.runner ?: TODO()
-        val context = contexts[runner.componentId] ?: TODO()
-        check(context.current.runner == runner)
+        val runner = nodeMap[id]?.runner
+        checkNotNull(runner) { ERR_V_MSG_7 }
+
+        val context = contexts[runner.componentId]
+        checkNotNull(context) { ERR_V_MSG_7 }
+        check(context.current.runner == runner) { ERR_V_MSG_7 }
 
         runner.interrupt()
 
@@ -117,8 +128,11 @@ class ActionManager {
     }
 
     fun receiveEnd(id: Long) {
-        val runner = nodes[id]?.runner ?: TODO()
-        val context = contexts[runner.componentId] ?: TODO()
+        val runner = nodeMap[id]?.runner
+        checkNotNull(runner) { ERR_V_MSG_7 }
+
+        val context = contexts[runner.componentId]
+        checkNotNull(context) { ERR_V_MSG_7 }
         check(context.current.runner == runner)
 
         // 終了を通知
@@ -130,7 +144,7 @@ class ActionManager {
                 runner.end()
             }
         }
-        nodes.remove(id)
+        nodeMap.remove(id)
 
         val next = context.current.next
         if (next != null) {
@@ -151,9 +165,18 @@ class ActionManager {
 
     fun update(delta: Float) {
         time += (delta * 1000.0f).toLong()
+
+        endEventRunners()
+
+        updateEvents()
+
+        startEventRunners()
     }
 
+    // Server only
     fun run(componentId: String, taskStore: TaskStore): Boolean {
+        check(mode == Mode.Server) { ERR_V_MSG_6 }
+
         // 現在実行中のTaskRunnerを確認
         val context = contexts[componentId]?.also {
             // 既にタスクが実行されている場合は強制割り込み
@@ -162,13 +185,28 @@ class ActionManager {
             // 割り込みを通知
             it.current.runner?.interrupt()
             contexts.remove(componentId)
-        } ?: ActionComponentContext(ActionNode(taskStore), time)
+        } ?: ActionComponentContext(ActionNode(componentId, taskStore), time)
 
         contexts[componentId] = context
 
+        return run(context.current)
+    }
+
+    fun ratio(eventRuntimeStore: EventRuntimeStore): Float {
+        return min(((time - eventRuntimeStore.startTime).toDouble() / eventRuntimeStore.eventStore.durationTime).toFloat(), 1.0f)
+    }
+
+    fun attachUpdatable(eventReducer: EventRunner<*, *>) {
+        updateEventRunners.add(eventReducer)
+    }
+
+    fun detachUpdatable(eventReducer: EventRunner<*, *>) {
+        updateEventRunners.remove(eventReducer)
+    }
+
+    private fun run(node: ActionNode): Boolean {
         // TaskRunnerのみ入り、即時実行するTaskRunnerのNodeが格納される
-        val contextQueue = mutableListOf(context.current)
-        context.current.store = taskStore
+        val contextQueue = mutableListOf(node)
 
         while (contextQueue.isNotEmpty()) {
             // contextQueueから１つの要素を取り除く
@@ -178,7 +216,7 @@ class ActionManager {
             // TaskRunnerを実行してActionを生成する
             // contextQueueにあるActionNodeは必ずstoreのみ存在する(1)
             val runner = createTaskRunner(
-                    componentId,
+                    node.componentId,
                     currentNode.store as TaskStore,
                     currentNode.parent?.runner as TaskRunner<*, *>?)
             val actionBuilder = ActionBuilder()
@@ -186,10 +224,12 @@ class ActionManager {
             runner.next(actionBuilder)
 
             currentNode.runner = runner
+            nodeMap[runner.id] = currentNode
 
             // Actionが生成されなければ現在のTaskRunnerを削除する
             if (actionBuilder.actionStoreQueue.isEmpty()) {
                 // TaskRunnerの終了通知
+                networkInterface?.sendActionRunnerEnd(runner.id)
                 runner.end()
 
                 val next = currentNode.next
@@ -213,7 +253,7 @@ class ActionManager {
             var i = 0
             while (i < actionBuilder.actionStoreQueue.size) {
                 val store = actionBuilder.actionStoreQueue[i]
-                val childNode = ActionNode(store, currentNode)
+                val childNode = ActionNode(node.componentId, store, currentNode)
                 if (prevNode == null) {
                     currentNode.children = childNode
                 } else {
@@ -228,7 +268,7 @@ class ActionManager {
             when (first.store) {
                 is EventStore -> {
                     // EventのリストにRunnerを追加
-                    attachEventRunnerToActionNode(componentId, first)
+                    attachEventRunners(node.componentId, first)
                 }
                 is TaskStore -> {
                     // Taskの場合は最初のTaskのみ実行させる
@@ -238,6 +278,10 @@ class ActionManager {
         }
 
         return true
+    }
+
+    private fun updateEvents() {
+        updateEventRunners.fastForEach { it.update(ratio(it.runtimeStore)) }
     }
 
     private fun createEventRunner(componentId: String, eventStore: EventStore, parentRunner: TaskRunner<*, *>?, startTime: Long): EventRunner<*, *> {
@@ -258,20 +302,30 @@ class ActionManager {
     }
 
     private fun createEventRunner(eventRuntimeStore: EventRuntimeStore): EventRunner<*, *> {
-        val eventRunnerFactory = eventRunnerFactories[eventRuntimeStore.eventStore.factoryClass] ?: TODO()
+        if (mode == Mode.Server) {
+            networkInterface?.sendActionRuntimeStore(eventRuntimeStore)
+        }
+        val eventRunnerFactory = eventRunnerFactories[eventRuntimeStore.eventStore.factoryClass]
+        checkNotNull(eventRunnerFactory) { ERR_F_MSG_2(eventRuntimeStore.eventStore.factoryClass, eventRunnerFactory) }
+
         return eventRunnerContextProvider.run(EventRunnerContext(eventRuntimeStore)) {
             eventRunnerFactory.create()
         }
     }
 
     private fun createTaskRunner(taskRuntimeStore: TaskRuntimeStore): TaskRunner<*, *> {
-        val taskRunnerFactory = taskRunnerFactories[taskRuntimeStore.taskStore.factoryClass] ?: TODO()
+        if (mode == Mode.Server) {
+            networkInterface?.sendActionRuntimeStore(taskRuntimeStore)
+        }
+        val taskRunnerFactory = taskRunnerFactories[taskRuntimeStore.taskStore.factoryClass]
+        checkNotNull(taskRunnerFactory) { ERR_F_MSG_4(taskRuntimeStore.taskStore.factoryClass, taskRunnerFactory) }
+
         return taskRunnerContextProvider.run(TaskRunnerContext(taskRuntimeStore)) {
             taskRunnerFactory.create()
         }
     }
 
-    private fun attachEventRunnerToActionNode(componentId: String, actionNode: ActionNode) {
+    private fun attachEventRunners(componentId: String, actionNode: ActionNode) {
         var startTime = time
         var current = actionNode
 
@@ -288,9 +342,93 @@ class ActionManager {
 
             // EventRunnerの登録
             current.runner = runner
+            nodeMap[runner.id] = current
+
             startTime += runner.store.durationTime
             current = current.next ?: break
         }
-        eventRunnersSortedByStartTime.sortBy { it.runtimeStore.startTime }
+        eventRunnersSortedByStartTime.sortBy { it.startTime }
+    }
+
+    private fun pullStartingEvents(): List<EventRunner<*, *>> {
+        var index = 0
+        val buffers = mutableListOf<EventRunner<*, *>>()
+
+        while (index < eventRunnersSortedByStartTime.size) {
+            val buffer = eventRunnersSortedByStartTime[index++]
+            if (buffer.startTime > time) {
+                break
+            }
+            buffers.add(buffer)
+        }
+
+        for (i in 0 until buffers.size) {
+            eventRunnersSortedByStartTime.removeAt(0)
+        }
+        return buffers
+    }
+
+    private fun pullEndingEvents(): List<EventRunner<*, *>> {
+        var index = 0
+        val buffers = arrayListOf<EventRunner<*, *>>()
+
+        while (index < eventRunnersSortedByEndTime.size) {
+            val buffer = eventRunnersSortedByEndTime[index++]
+            if (buffer.endTime > time) {
+                break
+            }
+            buffers.add(buffer)
+        }
+
+        for (x in buffers) {
+            eventRunnersSortedByEndTime.removeAt(0)
+        }
+        return buffers
+    }
+
+    private fun startEventRunners() {
+        if (mode != Mode.Server) {
+            return
+        }
+
+        val eventRunners = pullStartingEvents()
+        if (eventRunners.isEmpty()) {
+            return
+        }
+
+        for (eventRunner in eventRunners) {
+            eventRunner.start()
+
+            if (eventRunner.endTime <= time) {
+                eventRunner.end()
+                continue
+            }
+
+            eventRunnersSortedByEndTime.add(eventRunner)
+            if (eventRunner.updatable) {
+                updateEventRunners.add(eventRunner)
+            }
+        }
+        eventRunnersSortedByEndTime.sortBy { it.endTime }
+    }
+
+    private fun endEventRunners() {
+        if (mode != Mode.Server) {
+            return
+        }
+
+        val eventRunners = pullEndingEvents()
+        if (eventRunners.isEmpty()) {
+            return
+        }
+
+        for (x in eventRunners) {
+            val node = nodeMap[x.id]
+            checkNotNull(node) { ERR_V_MSG_8 }
+
+            if (!run(node)) {
+                // Finished
+            }
+        }
     }
 }

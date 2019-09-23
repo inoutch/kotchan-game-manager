@@ -8,10 +8,7 @@ import io.github.inoutch.kotchan.game.test.util.action.task.Custom1TaskRunnerFac
 import io.github.inoutch.kotchan.game.test.util.action.task.Custom1TaskStore
 import io.github.inoutch.kotchan.game.test.util.component.CustomComponentFactory
 import io.github.inoutch.kotchan.game.test.util.component.store.CustomStore
-import kotlin.test.BeforeTest
-import kotlin.test.Test
-import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
+import kotlin.test.*
 
 class ActionManagerTest {
     @BeforeTest
@@ -36,7 +33,7 @@ class ActionManagerTest {
         actionManager.registerTaskRunnerFactory(Custom1TaskRunnerFactory())
         actionManager.registerEventRunnerFactory(Custom1EventRunnerFactory())
 
-        val ret = actionManager.run(componentId, Custom1TaskStore("custom1"))
-        assertFalse { ret }
+        assertTrue { actionManager.run(componentId, Custom1TaskStore("custom1")) }
+        actionManager.update(0.499f)
     }
 }

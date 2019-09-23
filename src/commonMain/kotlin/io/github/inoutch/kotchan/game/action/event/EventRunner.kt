@@ -1,5 +1,6 @@
 package io.github.inoutch.kotchan.game.action.event
 
+import io.github.inoutch.kotchan.game.action.ActionManager.Companion.actionManager
 import io.github.inoutch.kotchan.game.action.ActionManager.Companion.eventRunnerContextProvider
 import io.github.inoutch.kotchan.game.action.ActionRunner
 import io.github.inoutch.kotchan.game.component.Component
@@ -9,7 +10,7 @@ import kotlin.reflect.KClass
 
 abstract class EventRunner<T : EventStore, U : Component>(
         val eventClass: KClass<T>,
-        val componentClass: KClass<U>) : ActionRunner {
+        componentClass: KClass<U>) : ActionRunner {
 
     val runtimeStore = eventRunnerContextProvider.current.eventRuntimeStore
 
@@ -22,20 +23,22 @@ abstract class EventRunner<T : EventStore, U : Component>(
 
     override val componentId = component.raw.id
 
+    val startTime = runtimeStore.startTime
+
     val endTime = runtimeStore.startTime + runtimeStore.eventStore.durationTime
 
-//    var updatable: Boolean = true
-//        set(value) {
-//            if (value == field) {
-//                return
-//            }
-//            if (updatable) {
-//                eventManager.attachUpdatable(this)
-//            } else {
-//                eventManager.detachUpdatable(this)
-//            }
-//            field = value
-//        }
+    var updatable: Boolean = true
+        set(value) {
+            if (value == field) {
+                return
+            }
+            if (updatable) {
+                actionManager.attachUpdatable(this)
+            } else {
+                actionManager.detachUpdatable(this)
+            }
+            field = value
+        }
 
     abstract fun start()
 
