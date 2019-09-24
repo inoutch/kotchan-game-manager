@@ -6,15 +6,18 @@ import io.github.inoutch.kotchan.game.action.ActionRunner
 import io.github.inoutch.kotchan.game.component.Component
 import io.github.inoutch.kotchan.game.component.ComponentManager.Companion.componentManager
 import io.github.inoutch.kotchan.game.error.ERR_F_MSG_3
+import io.github.inoutch.kotchan.game.error.ERR_F_MSG_5
+import io.github.inoutch.kotchan.game.extension.checkClass
 import kotlin.reflect.KClass
 
 abstract class EventRunner<T : EventStore, U : Component>(
-        val eventClass: KClass<T>,
+        eventClass: KClass<T>,
         componentClass: KClass<U>) : ActionRunner {
 
     val runtimeStore = eventRunnerContextProvider.current.eventRuntimeStore
 
-    val store = runtimeStore.eventStore
+    val store = runtimeStore.eventStore.checkClass(eventClass)
+            ?: throw IllegalStateException(ERR_F_MSG_5(eventClass, runtimeStore.eventStore::class))
 
     override val id = runtimeStore.id
 
@@ -40,9 +43,7 @@ abstract class EventRunner<T : EventStore, U : Component>(
             field = value
         }
 
-    abstract fun start()
-
     abstract fun update(ratio: Float)
 
-    abstract fun end()
+    abstract fun allowInterrupt(): Boolean
 }

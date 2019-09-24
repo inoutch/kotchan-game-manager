@@ -96,7 +96,7 @@ class ActionManager {
         }
 
         val parent = nodeMap[actionRuntimeStore.parentId]
-        val actionNode = ActionNode(runner.componentId, store, parent, runner)
+        val actionNode = ActionNode(runner.componentId, store, null, parent, runner)
 
         if (parent != null) {
             // 親の要素に子を登録
@@ -174,22 +174,17 @@ class ActionManager {
     }
 
     // Server only
-    fun run(componentId: String, taskStore: TaskStore): Boolean {
+    fun run(componentId: String, taskStore: TaskStore, endCallback: (() -> Unit)? = null) {
         check(mode == Mode.Server) { ERR_V_MSG_6 }
+        check(!contexts.containsKey(componentId))
 
         // 現在実行中のTaskRunnerを確認
-        val context = contexts[componentId]?.also {
-            // 既にタスクが実行されている場合は強制割り込み
-            networkInterface?.sendInterrupt(it.current.runner!!.id)
-
-            // 割り込みを通知
-            it.current.runner?.interrupt()
-            contexts.remove(componentId)
-        } ?: ActionComponentContext(ActionNode(componentId, taskStore), time)
-
+        val context = ActionComponentContext(ActionNode(componentId, taskStore, endCallback), time)
         contexts[componentId] = context
 
-        return run(context.current)
+        if (run(context.current)) {
+            endCallback?.invoke()
+        }
     }
 
     fun ratio(eventRuntimeStore: EventRuntimeStore): Float {
@@ -204,24 +199,57 @@ class ActionManager {
         updateEventRunners.remove(eventReducer)
     }
 
-    private fun run(node: ActionNode): Boolean {
-        // TaskRunnerのみ入り、即時実行するTaskRunnerのNodeが格納される
-        val contextQueue = mutableListOf(node)
+    fun interrupt(actionRunner: ActionRunner) {
+        val context = contexts[actionRunner.componentId]
+        checkNotNull(context)
 
-        while (contextQueue.isNotEmpty()) {
-            // contextQueueから１つの要素を取り除く
-            val currentNode = contextQueue.first()
-            contextQueue.removeAt(0)
+        val runner = context.current.runner
+        check(runner is EventRunner<*, *>)
+
+        if (runner.allowInterrupt()) {
+            // 割り込みを許可する場合は即時親に実行を移す
+            val parent = context.current.parent
+            if (parent == null || run(parent)) {
+                // 実行するものがない場合は終了通知と後始末をする
+                contexts.remove(actionRunner.componentId)
+                context.current.endCallback?.invoke()
+            }
+            return
+        }
+
+        // 割り込みが許可されない場合は、実行中のEvent以外を終了させる
+        while (eventRunnersSortedByStartTime.size >= 2) {
+            eventRunnersSortedByStartTime.removeAt(1)
+        }
+        context.current.next = null
+    }
+
+    private fun run(node: ActionNode, interrupt: ActionRunner? = null): Boolean {
+        val context = contexts[node.componentId]
+        checkNotNull(context) { ERR_V_MSG_9 }
+
+        // TaskRunnerのみ入り、即時実行するTaskRunnerのNodeが格納される
+        val nodeQueue = mutableListOf(node)
+
+        while (nodeQueue.isNotEmpty()) {
+            // nodeQueueから１つの要素を取り除く
+            val currentNode = nodeQueue.first()
+            nodeQueue.removeAt(0)
+            context.current = currentNode
 
             // TaskRunnerを実行してActionを生成する
             // contextQueueにあるActionNodeは必ずstoreのみ存在する(1)
-            val runner = createTaskRunner(
+            val runner = currentNode.runner as TaskRunner<*, *>? ?: createTaskRunner(
                     node.componentId,
                     currentNode.store as TaskStore,
                     currentNode.parent?.runner as TaskRunner<*, *>?)
             val actionBuilder = ActionBuilder()
-            runner.start()
-            runner.next(actionBuilder)
+            if (interrupt == null) {
+                runner.start()
+                runner.next(actionBuilder)
+            } else {
+                runner.nextInterrupted(actionBuilder, interrupt)
+            }
 
             currentNode.runner = runner
             nodeMap[runner.id] = currentNode
@@ -231,21 +259,22 @@ class ActionManager {
                 // TaskRunnerの終了通知
                 networkInterface?.sendActionRunnerEnd(runner.id)
                 runner.end()
+                nodeMap.remove(runner.id)
 
                 val next = currentNode.next
                 if (next != null) {
                     // 同じ階層の次のTaskRunnerを実行する
-                    contextQueue.add(next)
+                    nodeQueue.add(next)
                     continue
                 }
                 val parent = currentNode.parent
                 if (parent != null) {
                     // 親のTaskRunnerをもう一度実行する
-                    contextQueue.add(parent)
+                    nodeQueue.add(parent)
                     continue
                 }
                 // 引数から受け取ったTaskStoreのTaskRunnerの実行をやめる
-                return false
+                return true
             }
 
             // ActionNodeのchildrenを構造化する
@@ -253,7 +282,7 @@ class ActionManager {
             var i = 0
             while (i < actionBuilder.actionStoreQueue.size) {
                 val store = actionBuilder.actionStoreQueue[i]
-                val childNode = ActionNode(node.componentId, store, currentNode)
+                val childNode = ActionNode(node.componentId, store, null, currentNode)
                 if (prevNode == null) {
                     currentNode.children = childNode
                 } else {
@@ -272,12 +301,12 @@ class ActionManager {
                 }
                 is TaskStore -> {
                     // Taskの場合は最初のTaskのみ実行させる
-                    contextQueue.add(first)
+                    nodeQueue.add(first)
                 }
             }
         }
 
-        return true
+        return false
     }
 
     private fun updateEvents() {
@@ -288,8 +317,8 @@ class ActionManager {
         return createEventRunner(EventRuntimeStore(
                 componentId,
                 runtimeActionIdManager.nextId(),
-                startTime,
                 parentRunner?.id ?: -1,
+                startTime,
                 eventStore))
     }
 
@@ -400,7 +429,7 @@ class ActionManager {
             eventRunner.start()
 
             if (eventRunner.endTime <= time) {
-                eventRunner.end()
+                endEventRunner(eventRunner)
                 continue
             }
 
@@ -422,13 +451,34 @@ class ActionManager {
             return
         }
 
-        for (x in eventRunners) {
-            val node = nodeMap[x.id]
-            checkNotNull(node) { ERR_V_MSG_8 }
+        for (eventRunner in eventRunners) {
+            // EventRunnerの終了
+            endEventRunner(eventRunner)
+        }
+    }
 
-            if (!run(node)) {
-                // Finished
-            }
+    private fun endEventRunner(runner: EventRunner<*, *>) {
+        val node = nodeMap[runner.id]
+        checkNotNull(node)
+
+        runner.end()
+        nodeMap.remove(runner.id)
+        updateEventRunners.remove(node.runner)
+
+        val context = contexts[node.componentId]
+        checkNotNull(context) { ERR_V_MSG_9 }
+
+        // 同じ階層にEventRunnerがある場合はそちらをcurrentにする
+        val next = node.next
+        if (next != null) {
+            context.current = next
+            return
+        }
+
+        // 親がある場合は親のTaskRunnerを実行する
+        val parent = node.parent
+        if (parent == null || run(parent)) {
+            node.endCallback?.invoke()
         }
     }
 }

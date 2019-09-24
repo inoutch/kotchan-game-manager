@@ -15,9 +15,10 @@ const val ERR_V_MSG_5 = "Factory type is null"
 const val ERR_V_MSG_6 = "Client only operation"
 const val ERR_V_MSG_7 = "Invalid action was received"
 const val ERR_V_MSG_8 = "ActionNode is not registered by id"
+const val ERR_V_MSG_9 = "ActionComponentContext is not registered by component id"
 
 fun ERR_F_MSG_0(expected: KClass<*>, actual: KClass<*>) =
-        "Invalid access of actionStore [expected: ${className(expected)}, actual: ${className(actual)}]"
+        "Invalid access of store [expected: ${className(expected)}, actual: ${className(actual)}]"
 
 fun ERR_F_MSG_1(expected: String, actual: ComponentFactory?) =
         "ComponentFactory is not registered [expected: $expected, actual: ${actual?.let { className(it::class) }}]"
@@ -30,3 +31,6 @@ fun <T : Component> ERR_F_MSG_3(expected: KClass<T>) =
 
 fun ERR_F_MSG_4(expected: String, actual: TaskRunnerFactory?) =
         "TaskRunnerFactory is not registered [expected: $expected, actual: ${actual?.let { className(it::class) }}]"
+
+fun ERR_F_MSG_5(expected: KClass<*>, actual: KClass<*>) =
+        "Invalid access of actionStore [expected: ${className(expected)}, actual: ${className(actual)}]"

@@ -23,9 +23,7 @@ abstract class TaskRunner<T : TaskStore, U : Component>(
 
     override val componentId = component.raw.id
 
-    abstract fun start()
-
-    abstract fun end()
-
     abstract fun next(builder: ActionBuilder)
+
+    abstract fun nextInterrupted(builder: ActionBuilder, caller: ActionRunner)
 }

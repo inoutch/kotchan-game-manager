@@ -5,5 +5,9 @@ interface ActionRunner {
 
     val componentId: String
 
+    fun start()
+
+    fun end()
+
     fun interrupt()
 }
