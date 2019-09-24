@@ -5,7 +5,7 @@ import io.github.inoutch.kotchan.game.extension.className
 import kotlinx.serialization.Serializable
 
 @Serializable
-class Custom1TaskStore(val customValue: String) : TaskStore() {
+class Custom1TaskStore(val customValue: String, var count: Int = 3) : TaskStore() {
     override val factoryClass: String
         get() = className(Custom1TaskRunnerFactory::class)
 }

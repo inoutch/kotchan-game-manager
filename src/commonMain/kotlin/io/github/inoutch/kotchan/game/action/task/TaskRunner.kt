@@ -6,6 +6,8 @@ import io.github.inoutch.kotchan.game.action.ActionRunner
 import io.github.inoutch.kotchan.game.component.Component
 import io.github.inoutch.kotchan.game.component.ComponentManager.Companion.componentManager
 import io.github.inoutch.kotchan.game.error.ERR_F_MSG_3
+import io.github.inoutch.kotchan.game.error.ERR_F_MSG_5
+import io.github.inoutch.kotchan.game.extension.checkClass
 import kotlin.reflect.KClass
 
 abstract class TaskRunner<T : TaskStore, U : Component>(
@@ -14,7 +16,8 @@ abstract class TaskRunner<T : TaskStore, U : Component>(
 
     val runtimeStore = taskRunnerContextProvider.current.taskRuntimeStore
 
-    val store = runtimeStore.taskStore
+    val store = runtimeStore.taskStore.checkClass(taskClass)
+            ?: throw IllegalStateException(ERR_F_MSG_5(taskClass, runtimeStore.taskStore::class))
 
     override val id = runtimeStore.id
 

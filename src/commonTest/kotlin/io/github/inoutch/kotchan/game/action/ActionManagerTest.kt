@@ -39,7 +39,7 @@ class ActionManagerTest {
 
         var isEnd = false
         val status = mutableListOf<String>()
-        actionManager.run(componentId, Custom1TaskStore("custom1")) { isEnd = true }
+        actionManager.run(componentId, Custom1TaskStore("custom1", 1)) { isEnd = true }
 
         actionManager.update(0.499f)
         status.add("start-e1")
@@ -56,7 +56,14 @@ class ActionManagerTest {
         status.add("end-e3")
         assertEquals(status, component.raw.states)
 
-        assertFalse { isEnd }
+        actionManager.update(0.1f)
+        assertTrue { isEnd }
+
+        // Check cleanup
+        assertEquals(0, actionManager.nodeSize)
+        assertEquals(0, actionManager.contextSize)
+        assertEquals(0, actionManager.runningEventSize)
+        assertEquals(0, actionManager.updatingEventSize)
     }
 
     @Test
@@ -73,17 +80,45 @@ class ActionManagerTest {
         val component2 = componentManager.findById(component2Id, CustomComponent::class)
         assertNotNull(component2)
 
+        var isEnd1 = false
+
+        var isEnd2 = false
+
         val status = mutableListOf<String>()
         actionManager.registerTaskRunnerFactory(Custom1TaskRunnerFactory())
         actionManager.registerEventRunnerFactory(Custom1EventRunnerFactory())
 
-        actionManager.run(component1Id, Custom1TaskStore("custom1"))
+        actionManager.run(component1Id, Custom1TaskStore("custom1")) { isEnd1 = true }
         actionManager.update(0.5f)
 
-        actionManager.run(component2Id, Custom1TaskStore("custom2"))
-        actionManager.update(0.499f)
+        actionManager.run(component2Id, Custom1TaskStore("custom2", 1)) { isEnd2 = true }
+        actionManager.update(0.498f)
 
         status.add("start-e1")
         assertEquals(status, component2.raw.states)
+
+        actionManager.update(1.000f)
+        status.add("end-e1")
+        status.add("start-e2")
+        status.add("end-e2")
+        status.add("start-e3")
+        assertEquals(status, component2.raw.states)
+
+        actionManager.update(0.001f)
+        status.add("update-e3")
+        assertEquals(status, component2.raw.states)
+
+        actionManager.update(0.001f)
+        status.add("end-e3")
+        assertEquals(status, component2.raw.states)
+
+        assertFalse { isEnd1 }
+        assertTrue { isEnd2 }
+
+        // Check cleanup
+        assertEquals(3, actionManager.nodeSize)
+        assertEquals(1, actionManager.contextSize)
+        assertEquals(1, actionManager.runningEventSize)
+        assertEquals(1, actionManager.updatingEventSize)
     }
 }

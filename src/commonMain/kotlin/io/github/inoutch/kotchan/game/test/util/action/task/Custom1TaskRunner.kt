@@ -15,6 +15,9 @@ class Custom1TaskRunner : TaskRunner<Custom1TaskStore, CustomComponent>(Custom1T
     }
 
     override fun next(builder: ActionBuilder) {
+        if (store.count-- <= 0) {
+            return
+        }
         builder.enqueue(Custom1EventStore("e1", 500))
         builder.enqueue(Custom1EventStore("e2", 500))
         builder.enqueue(Custom1EventStore("e3", 500))

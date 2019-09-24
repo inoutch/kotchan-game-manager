@@ -53,6 +53,19 @@ class ActionManager {
     // Serialization
     private lateinit var serializer: ProtoBuf
 
+    // Counter
+    val nodeSize: Int
+        get() = nodeMap.size
+
+    val contextSize: Int
+        get() = contexts.size
+
+    val runningEventSize: Int
+        get() = eventRunnersSortedByEndTime.size
+
+    val updatingEventSize: Int
+        get() = updateEventRunners.size
+
     fun init(registerCallback: SerializersModuleBuilder.() -> Unit) {
         val module = SerializersModule(registerCallback)
         serializer = ProtoBuf(context = module)
@@ -182,9 +195,7 @@ class ActionManager {
         val context = ActionComponentContext(ActionNode(componentId, taskStore, endCallback), time)
         contexts[componentId] = context
 
-        if (run(context.current)) {
-            endCallback?.invoke()
-        }
+        run(context.current)
     }
 
     fun ratio(eventRuntimeStore: EventRuntimeStore): Float {
@@ -224,7 +235,7 @@ class ActionManager {
         context.current.next = null
     }
 
-    private fun run(node: ActionNode, interrupt: ActionRunner? = null): Boolean {
+    private fun run(node: ActionNode, interrupt: ActionRunner? = null, startTime: Long = this.time): Boolean {
         val context = contexts[node.componentId]
         checkNotNull(context) { ERR_V_MSG_9 }
 
@@ -274,6 +285,8 @@ class ActionManager {
                     continue
                 }
                 // 引数から受け取ったTaskStoreのTaskRunnerの実行をやめる
+                currentNode.endCallback?.invoke()
+                contexts.remove(currentNode.componentId)
                 return true
             }
 
@@ -297,7 +310,7 @@ class ActionManager {
             when (first.store) {
                 is EventStore -> {
                     // EventのリストにRunnerを追加
-                    attachEventRunners(node.componentId, first)
+                    attachEventRunners(node.componentId, first, startTime)
                 }
                 is TaskStore -> {
                     // Taskの場合は最初のTaskのみ実行させる
@@ -354,7 +367,7 @@ class ActionManager {
         }
     }
 
-    private fun attachEventRunners(componentId: String, actionNode: ActionNode) {
+    private fun attachEventRunners(componentId: String, actionNode: ActionNode, time: Long) {
         var startTime = time
         var current = actionNode
 
@@ -477,7 +490,7 @@ class ActionManager {
 
         // 親がある場合は親のTaskRunnerを実行する
         val parent = node.parent
-        if (parent == null || run(parent)) {
+        if (parent == null || run(parent, null, runner.endTime)) {
             node.endCallback?.invoke()
         }
     }
