@@ -256,7 +256,10 @@ class ActionManager {
                     currentNode.parent?.runner as TaskRunner<*, *>?)
             val actionBuilder = ActionBuilder()
             if (interrupt == null) {
-                runner.start()
+                // Runnerが生成された場合のみstartを実行する
+                if (currentNode.runner == null) {
+                    runner.start()
+                }
                 runner.next(actionBuilder)
             } else {
                 runner.nextInterrupted(actionBuilder, interrupt)

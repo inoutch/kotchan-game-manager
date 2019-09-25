@@ -9,23 +9,28 @@ import io.github.inoutch.kotchan.game.test.util.component.CustomComponent
 class Custom1TaskRunner : TaskRunner<Custom1TaskStore, CustomComponent>(Custom1TaskStore::class, CustomComponent::class) {
 
     override fun start() {
+        component.raw.states.add("${store.customValue}-t1-start")
     }
 
     override fun end() {
+        component.raw.states.add("${store.customValue}-t1-end")
     }
 
     override fun next(builder: ActionBuilder) {
         if (store.count-- <= 0) {
             return
         }
-        builder.enqueue(Custom1EventStore("e1", 500))
-        builder.enqueue(Custom1EventStore("e2", 500))
-        builder.enqueue(Custom1EventStore("e3", 500))
+
+        builder.enqueue(Custom1EventStore("${store.customValue}-ce1", 500))
+        builder.enqueue(Custom1EventStore("${store.customValue}-ce2", 500))
+        builder.enqueue(Custom1EventStore("${store.customValue}-ce3", 500))
     }
 
     override fun nextInterrupted(builder: ActionBuilder, caller: ActionRunner) {
+        // Ignore
     }
 
     override fun interrupt() {
+        component.raw.states.add("${store.customValue}-t1-interrupt")
     }
 }
