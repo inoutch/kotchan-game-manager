@@ -184,6 +184,29 @@ class ActionManagerTest {
 
     @Test
     fun checkInterrupt() {
+        val componentId = componentManager.createComponent(CustomStore("action"))
+        assertNotNull(componentId)
 
+        val component = componentManager.findById(componentId, CustomComponent::class)
+        assertNotNull(component)
+
+        actionManager.registerTaskRunnerFactory(Custom1TaskRunnerFactory())
+        actionManager.registerEventRunnerFactory(Custom1EventRunnerFactory())
+
+        var isEnd = false
+        val status = mutableListOf<String>()
+        actionManager.run(componentId, Custom1TaskStore("ct1", 1)) { isEnd = true }
+        actionManager.update(0.999f)
+
+        actionManager.interrupt(componentId)
+
+        actionManager.update(0.001f)
+
+        assertTrue { isEnd }
+        // Check cleanup
+        assertEquals(0, actionManager.nodeSize)
+        assertEquals(0, actionManager.contextSize)
+        assertEquals(0, actionManager.runningEventSize)
+        assertEquals(0, actionManager.updatingEventSize)
     }
 }

@@ -7,4 +7,5 @@ class ActionNode(
         var parent: ActionNode? = null,
         var runner: ActionRunner? = null,
         var children: ActionNode? = null,
-        var next: ActionNode? = null)
+        var next: ActionNode? = null,
+        var interrupt: Boolean = false)

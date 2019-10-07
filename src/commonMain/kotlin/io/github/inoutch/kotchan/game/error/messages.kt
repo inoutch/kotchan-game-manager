@@ -16,6 +16,7 @@ const val ERR_V_MSG_6 = "Client only operation"
 const val ERR_V_MSG_7 = "Invalid action was received"
 const val ERR_V_MSG_8 = "ActionNode is not registered by id"
 const val ERR_V_MSG_9 = "ActionComponentContext is not registered by component id"
+const val ERR_V_MSG_10 = "There are not running action of its component id"
 
 fun ERR_F_MSG_0(expected: KClass<*>, actual: KClass<*>) =
         "Invalid access of store [expected: ${className(expected)}, actual: ${className(actual)}]"

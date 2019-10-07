@@ -1,6 +1,7 @@
 package io.github.inoutch.kotchan.game.action.task
 
 import io.github.inoutch.kotchan.game.action.ActionBuilder
+import io.github.inoutch.kotchan.game.action.ActionManager.Companion.actionManager
 import io.github.inoutch.kotchan.game.action.ActionManager.Companion.taskRunnerContextProvider
 import io.github.inoutch.kotchan.game.action.ActionRunner
 import io.github.inoutch.kotchan.game.component.Component
@@ -27,6 +28,4 @@ abstract class TaskRunner<T : TaskStore, U : Component>(
     override val componentId = component.raw.id
 
     abstract fun next(builder: ActionBuilder)
-
-    abstract fun nextInterrupted(builder: ActionBuilder, caller: ActionRunner)
 }

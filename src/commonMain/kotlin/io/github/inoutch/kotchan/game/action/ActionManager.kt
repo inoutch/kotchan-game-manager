@@ -192,7 +192,7 @@ class ActionManager {
         check(!contexts.containsKey(componentId))
 
         // 現在実行中のTaskRunnerを確認
-        val context = ActionComponentContext(ActionNode(componentId, taskStore, endCallback), time)
+        val context = ActionComponentContext(ActionNode(componentId, taskStore, endCallback))
         contexts[componentId] = context
 
         run(context.current)
@@ -210,32 +210,52 @@ class ActionManager {
         updateEventRunners.remove(eventReducer)
     }
 
-    fun interrupt(actionRunner: ActionRunner) {
-        val context = contexts[actionRunner.componentId]
+    fun interrupt(componentId: String) {
+        val context = contexts[componentId]
         checkNotNull(context)
+
+        // 割り込みフラグを立てる
+        context.current.interrupt = true
 
         val runner = context.current.runner
         check(runner is EventRunner<*, *>)
 
-        if (runner.allowInterrupt()) {
+        // 現在実行中のEventRunnerに割り込み許可の確認と通知をする
+        val allowedInterrupt = runner.allowInterrupt()
+        runner.interrupt()
+
+        // 現在キューにあって実行中でないEventRunnerの割り込み処理と後始末をする
+        var next = context.current.next
+        while (next != null) {
+            val nextRunner = next.runner
+            checkNotNull(nextRunner)
+
+            nextRunner.interrupt()
+            nodeMap.remove(nextRunner.id)
+            next = next.next
+        }
+
+        if (allowedInterrupt) {
             // 割り込みを許可する場合は即時親に実行を移す
             val parent = context.current.parent
             if (parent == null || run(parent)) {
                 // 実行するものがない場合は終了通知と後始末をする
-                contexts.remove(actionRunner.componentId)
+                contexts.remove(componentId)
                 context.current.endCallback?.invoke()
             }
             return
         }
 
-        // 割り込みが許可されない場合は、実行中のEvent以外を終了させる
-        while (eventRunnersSortedByStartTime.size >= 2) {
-            eventRunnersSortedByStartTime.removeAt(1)
-        }
+        // 割り込みが許可されない場合は実行中のEventRunnerを最後にすることで、実行後に自動的に実行が親に移る
         context.current.next = null
     }
 
-    private fun run(node: ActionNode, interrupt: ActionRunner? = null, startTime: Long = this.time): Boolean {
+    fun getInterruptedChildActionRunner(parent: TaskRunner<*, *>): ActionRunner? {
+        val node = nodeMap[parent.id]?.children ?: return null
+        return if (node.interrupt) node.runner else null
+    }
+
+    private fun run(node: ActionNode, startTime: Long = this.time): Boolean {
         val context = contexts[node.componentId]
         checkNotNull(context) { ERR_V_MSG_9 }
 
@@ -255,15 +275,11 @@ class ActionManager {
                     currentNode.store as TaskStore,
                     currentNode.parent?.runner as TaskRunner<*, *>?)
             val actionBuilder = ActionBuilder()
-            if (interrupt == null) {
-                // Runnerが生成された場合のみstartを実行する
-                if (currentNode.runner == null) {
-                    runner.start()
-                }
-                runner.next(actionBuilder)
-            } else {
-                runner.nextInterrupted(actionBuilder, interrupt)
+            // Runnerが生成された場合のみstartを実行する
+            if (currentNode.runner == null) {
+                runner.start()
             }
+            runner.next(actionBuilder)
 
             currentNode.runner = runner
             nodeMap[runner.id] = currentNode
@@ -493,7 +509,7 @@ class ActionManager {
 
         // 親がある場合は親のTaskRunnerを実行する
         val parent = node.parent
-        if (parent == null || run(parent, null, runner.endTime)) {
+        if (parent == null || run(parent, runner.endTime)) {
             node.endCallback?.invoke()
         }
     }

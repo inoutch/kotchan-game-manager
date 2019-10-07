@@ -1,20 +1,11 @@
 package io.github.inoutch.kotchan.game.test.util.action.task
 
 import io.github.inoutch.kotchan.game.action.ActionBuilder
-import io.github.inoutch.kotchan.game.action.ActionRunner
 import io.github.inoutch.kotchan.game.action.task.TaskRunner
 import io.github.inoutch.kotchan.game.test.util.action.event.Custom1EventStore
 import io.github.inoutch.kotchan.game.test.util.component.CustomComponent
 
 class Custom1TaskRunner : TaskRunner<Custom1TaskStore, CustomComponent>(Custom1TaskStore::class, CustomComponent::class) {
-
-    override fun start() {
-        component.raw.states.add("${store.customValue}-t1-start")
-    }
-
-    override fun end() {
-        component.raw.states.add("${store.customValue}-t1-end")
-    }
 
     override fun next(builder: ActionBuilder) {
         if (store.count-- <= 0) {
@@ -26,8 +17,12 @@ class Custom1TaskRunner : TaskRunner<Custom1TaskStore, CustomComponent>(Custom1T
         builder.enqueue(Custom1EventStore("${store.customValue}-ce3", 500))
     }
 
-    override fun nextInterrupted(builder: ActionBuilder, caller: ActionRunner) {
-        // Ignore
+    override fun start() {
+        component.raw.states.add("${store.customValue}-t1-start")
+    }
+
+    override fun end() {
+        component.raw.states.add("${store.customValue}-t1-end")
     }
 
     override fun interrupt() {
