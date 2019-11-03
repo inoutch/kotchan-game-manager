@@ -1,6 +1,7 @@
 package io.github.inoutch.kotchan.game.action
 
 import io.github.inoutch.kotchan.game.action.event.EventStore
+import io.github.inoutch.kotchan.game.action.nop.NoOperationStore
 import io.github.inoutch.kotchan.game.action.task.TaskStore
 
 class ActionBuilder {
@@ -23,5 +24,9 @@ class ActionBuilder {
         check(type != 0)
         type = 1
         privateActionStoreQueue.add(actionStore)
+    }
+
+    fun enqueue(noOperationStore: NoOperationStore) {
+        privateActionStoreQueue.add(noOperationStore)
     }
 }

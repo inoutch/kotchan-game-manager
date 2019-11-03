@@ -1,6 +1,7 @@
 package io.github.inoutch.kotchan.game.action
 
 import io.github.inoutch.kotchan.game.action.event.*
+import io.github.inoutch.kotchan.game.action.nop.*
 import io.github.inoutch.kotchan.game.action.task.*
 import io.github.inoutch.kotchan.game.error.*
 import io.github.inoutch.kotchan.game.extension.className
@@ -23,6 +24,8 @@ class ActionManager {
         val taskRunnerContextProvider = ContextProvider<TaskRunnerContext>()
 
         val eventRunnerContextProvider = ContextProvider<EventRunnerContext>()
+
+        val nopRunnerContextProvider = ContextProvider<NoOperationRunnerContext>()
     }
 
     private val contexts = mutableMapOf<String, ActionComponentContext>() // Group by componentId
@@ -73,6 +76,9 @@ class ActionManager {
         contexts.clear()
         nodeMap.clear()
         runtimeActionIdManager.reset()
+        eventRunnersSortedByStartTime.clear()
+        eventRunnersSortedByEndTime.clear()
+        updateEventRunners.clear()
 
         unregisterAllTaskRunnerFactories()
         unregisterAllEventRunnerFactories()
@@ -94,6 +100,83 @@ class ActionManager {
         eventRunnerFactories.clear()
     }
 
+    fun update(delta: Float) {
+        time += (delta * 1000.0f).toLong()
+
+        endEventRunners()
+
+        updateEventRunners()
+
+        startEventRunners()
+    }
+
+    // Server only
+    fun run(componentId: String, taskStore: TaskStore, endCallback: (() -> Unit)? = null) {
+        // 現在実行中のTaskRunnerを確認
+        check(mode == Mode.Server) { ERR_V_MSG_6 }
+        check(!contexts.containsKey(componentId))
+
+        // 対象のComponent用のContextを生成する
+        val context = ActionComponentContext(ActionNode(componentId, taskStore, endCallback))
+        contexts[componentId] = context
+
+        run(context.current)
+    }
+
+    fun ratio(eventRuntimeStore: EventRuntimeStore): Float {
+        return min(((time - eventRuntimeStore.startTime).toDouble() / eventRuntimeStore.eventStore.durationTime).toFloat(), 1.0f)
+    }
+
+    fun attachUpdatable(eventReducer: EventRunner<*, *>) {
+        updateEventRunners.add(eventReducer)
+    }
+
+    fun detachUpdatable(eventReducer: EventRunner<*, *>) {
+        updateEventRunners.remove(eventReducer)
+    }
+
+    fun interrupt(componentId: String) {
+        val context = contexts[componentId]
+        checkNotNull(context)
+
+        // 現在実行中のActionRunnerを取得
+        val runner = context.current.runner
+        check(runner is EventRunner<*, *>)
+
+        // 割り込みフラグを立てる
+        context.current.interceptor = runner
+
+        // 現在実行中のEventRunnerに割り込み許可の確認と通知をする
+        val allowedInterrupt = runner.allowInterrupt()
+        runner.interrupt()
+
+        // 現在キューにあって実行中でないEventRunnerの割り込み処理と後始末をする
+        var next = context.current.next
+        while (next != null) {
+            val nextRunner = next.runner
+            checkNotNull(nextRunner)
+
+            nextRunner.interrupt()
+            nodeMap.remove(nextRunner.id)
+            next = next.next
+        }
+
+        // 割り込みを許可する場合は即時親に実行を移す
+        if (allowedInterrupt) {
+            val parent = context.current.parent
+            if (parent == null || run(parent)) {
+                // 実行するものがない場合は終了通知と後始末をする
+                contexts.remove(componentId)
+                context.current.endCallback?.invoke()
+            }
+            return
+        }
+
+        // 割り込みが許可されない場合は実行中のEventRunnerを最後にする
+        context.current.next = null
+    }
+
+    // Client only
     fun receiveActionRuntimeStore(actionRuntimeStore: ActionRuntimeStore) {
         val store: ActionStore
         val runner = when (actionRuntimeStore) {
@@ -128,6 +211,7 @@ class ActionManager {
     }
 
     fun receiveInterrupt(id: Long) {
+        TODO("refactor")
         val runner = nodeMap[id]?.runner
         checkNotNull(runner) { ERR_V_MSG_7 }
 
@@ -141,6 +225,7 @@ class ActionManager {
     }
 
     fun receiveEnd(id: Long) {
+        TODO("refactor")
         val runner = nodeMap[id]?.runner
         checkNotNull(runner) { ERR_V_MSG_7 }
 
@@ -176,100 +261,23 @@ class ActionManager {
         context.current = parent
     }
 
-    fun update(delta: Float) {
-        time += (delta * 1000.0f).toLong()
-
-        endEventRunners()
-
-        updateEvents()
-
-        startEventRunners()
-    }
-
-    // Server only
-    fun run(componentId: String, taskStore: TaskStore, endCallback: (() -> Unit)? = null) {
-        check(mode == Mode.Server) { ERR_V_MSG_6 }
-        check(!contexts.containsKey(componentId))
-
-        // 現在実行中のTaskRunnerを確認
-        val context = ActionComponentContext(ActionNode(componentId, taskStore, endCallback))
-        contexts[componentId] = context
-
-        run(context.current)
-    }
-
-    fun ratio(eventRuntimeStore: EventRuntimeStore): Float {
-        return min(((time - eventRuntimeStore.startTime).toDouble() / eventRuntimeStore.eventStore.durationTime).toFloat(), 1.0f)
-    }
-
-    fun attachUpdatable(eventReducer: EventRunner<*, *>) {
-        updateEventRunners.add(eventReducer)
-    }
-
-    fun detachUpdatable(eventReducer: EventRunner<*, *>) {
-        updateEventRunners.remove(eventReducer)
-    }
-
-    fun interrupt(componentId: String) {
-        val context = contexts[componentId]
-        checkNotNull(context)
-
-        // 割り込みフラグを立てる
-        context.current.interrupt = true
-
-        val runner = context.current.runner
-        check(runner is EventRunner<*, *>)
-
-        // 現在実行中のEventRunnerに割り込み許可の確認と通知をする
-        val allowedInterrupt = runner.allowInterrupt()
-        runner.interrupt()
-
-        // 現在キューにあって実行中でないEventRunnerの割り込み処理と後始末をする
-        var next = context.current.next
-        while (next != null) {
-            val nextRunner = next.runner
-            checkNotNull(nextRunner)
-
-            nextRunner.interrupt()
-            nodeMap.remove(nextRunner.id)
-            next = next.next
-        }
-
-        if (allowedInterrupt) {
-            // 割り込みを許可する場合は即時親に実行を移す
-            val parent = context.current.parent
-            if (parent == null || run(parent)) {
-                // 実行するものがない場合は終了通知と後始末をする
-                contexts.remove(componentId)
-                context.current.endCallback?.invoke()
-            }
-            return
-        }
-
-        // 割り込みが許可されない場合は実行中のEventRunnerを最後にすることで、実行後に自動的に実行が親に移る
-        context.current.next = null
-    }
-
-    fun getInterruptedChildActionRunner(parent: TaskRunner<*, *>): ActionRunner? {
-        val node = nodeMap[parent.id]?.children ?: return null
-        return if (node.interrupt) node.runner else null
-    }
-
-    private fun run(node: ActionNode, startTime: Long = this.time): Boolean {
+    private fun run(node: ActionNode, startTime: Long = this.time, interrupt: ActionRunner? = null): Boolean {
+        var currentInterrupt = interrupt
         val context = contexts[node.componentId]
         checkNotNull(context) { ERR_V_MSG_9 }
 
-        // TaskRunnerのみ入り、即時実行するTaskRunnerのNodeが格納される
+        // TaskRunnerのみ実行され、即時実行するTaskRunnerのNodeが格納される
         val nodeQueue = mutableListOf(node)
 
+        // 階層構造化されたTaskRunnerとEventRunnerを生成＆実行する
         while (nodeQueue.isNotEmpty()) {
             // nodeQueueから１つの要素を取り除く
             val currentNode = nodeQueue.first()
             nodeQueue.removeAt(0)
             context.current = currentNode
 
-            // TaskRunnerを実行してActionを生成する
-            // contextQueueにあるActionNodeは必ずstoreのみ存在する(1)
+            // TaskRunnerを実行して子のActionを生成する
+            // contextQueueにあるActionNodeは必ずstoreのみ存在する
             val runner = currentNode.runner as TaskRunner<*, *>? ?: createTaskRunner(
                     node.componentId,
                     currentNode.store as TaskStore,
@@ -279,12 +287,13 @@ class ActionManager {
             if (currentNode.runner == null) {
                 runner.start()
             }
-            runner.next(actionBuilder)
+            runner.next(actionBuilder, currentInterrupt)
 
+            // ActionNodeのrunnerは生成時nullであるため値をセットする
             currentNode.runner = runner
             nodeMap[runner.id] = currentNode
 
-            // Actionが生成されなければ現在のTaskRunnerを削除する
+            // ActionRunnerが生成されなければ現在のTaskRunnerの実行を終了して次の処理に備える
             if (actionBuilder.actionStoreQueue.isEmpty()) {
                 // TaskRunnerの終了通知
                 networkInterface?.sendActionRunnerEnd(runner.id)
@@ -293,21 +302,29 @@ class ActionManager {
 
                 val next = currentNode.next
                 if (next != null) {
-                    // 同じ階層の次のTaskRunnerを実行する
+                    // 同じ階層のActionがあれば次のTaskRunnerを実行する(元のActionRunnerはTaskRunner)
                     nodeQueue.add(next)
                     continue
                 }
+
                 val parent = currentNode.parent
                 if (parent != null) {
-                    // 親のTaskRunnerをもう一度実行する
+                    // 親のTaskRunnerを実行する
+                    if (currentInterrupt != null) {
+                        currentInterrupt = runner
+                    }
                     nodeQueue.add(parent)
                     continue
                 }
-                // 引数から受け取ったTaskStoreのTaskRunnerの実行をやめる
-                currentNode.endCallback?.invoke()
+
+                // このComponentに対するTaskRunnerの実行をやめる
+                currentNode.endCallback?.invoke() // 終了通知
                 contexts.remove(currentNode.componentId)
                 return true
             }
+
+            // 終了通知タスクの追加
+            actionBuilder.enqueue(NoOperationStore(NoOperationType.End))
 
             // ActionNodeのchildrenを構造化する
             var prevNode: ActionNode? = null
@@ -328,7 +345,7 @@ class ActionManager {
             val first = currentNode.children as ActionNode
             when (first.store) {
                 is EventStore -> {
-                    // EventのリストにRunnerを追加
+                    // EventのリストにEventRunnerを全て追加（nextがnullになるまで追加）
                     attachEventRunners(node.componentId, first, startTime)
                 }
                 is TaskStore -> {
@@ -341,7 +358,7 @@ class ActionManager {
         return false
     }
 
-    private fun updateEvents() {
+    private fun updateEventRunners() {
         updateEventRunners.fastForEach { it.update(ratio(it.runtimeStore)) }
     }
 
@@ -362,6 +379,14 @@ class ActionManager {
                 taskStore))
     }
 
+    private fun createNoOperationRunner(componentId: String, noOperationStore: NoOperationStore, parentRunner: ActionRunner?): NoOperationRunner {
+        return createNoOperationRunner(NoOperationRuntimeStore(
+                runtimeActionIdManager.nextId(),
+                componentId,
+                parentRunner?.id ?: -1,
+                noOperationStore))
+    }
+
     private fun createEventRunner(eventRuntimeStore: EventRuntimeStore): EventRunner<*, *> {
         if (mode == Mode.Server) {
             networkInterface?.sendActionRuntimeStore(eventRuntimeStore)
@@ -371,6 +396,15 @@ class ActionManager {
 
         return eventRunnerContextProvider.run(EventRunnerContext(eventRuntimeStore)) {
             eventRunnerFactory.create()
+        }
+    }
+
+    private fun createNoOperationRunner(noOperationRuntimeStore: NoOperationRuntimeStore): NoOperationRunner {
+        if (mode == Mode.Server) {
+            networkInterface?.sendActionRuntimeStore(noOperationRuntimeStore)
+        }
+        return nopRunnerContextProvider.run(NoOperationRunnerContext(noOperationRuntimeStore)) {
+            NoOperationRunner()
         }
     }
 
@@ -391,6 +425,9 @@ class ActionManager {
         var current = actionNode
 
         while (true) {
+            // Nopの確認
+
+
             // EventRunnerの作成
             val runner = createEventRunner(
                     componentId,
@@ -503,14 +540,33 @@ class ActionManager {
         // 同じ階層にEventRunnerがある場合はそちらをcurrentにする
         val next = node.next
         if (next != null) {
-            context.current = next
-            return
+            val nextRunner = next.runner
+            if (nextRunner !is NoOperationRunner) {
+                // 予約されたRunnerでない場合は実行を移す
+                context.current = next
+                return
+            }
+
+            when (nextRunner.store.type) {
+                NoOperationType.End -> {
+                    // 親がある場合は親のTaskRunnerを実行する
+                    val parent = node.parent
+                    if (parent == null || run(parent, runner.endTime)) {
+                        node.endCallback?.invoke()
+                        return
+                    }
+                }
+                NoOperationType.Interrupt -> {
+                    //
+                    val parent = node.parent
+                    if (parent == null || run(parent, runner.endTime, runner)) {
+                        node.endCallback?.invoke()
+                        return
+                    }
+                }
+            }
         }
 
-        // 親がある場合は親のTaskRunnerを実行する
-        val parent = node.parent
-        if (parent == null || run(parent, runner.endTime)) {
-            node.endCallback?.invoke()
-        }
+        throw IllegalStateException("Invalid event runner")
     }
 }

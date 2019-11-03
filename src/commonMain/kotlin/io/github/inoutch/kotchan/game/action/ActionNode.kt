@@ -8,4 +8,4 @@ class ActionNode(
         var runner: ActionRunner? = null,
         var children: ActionNode? = null,
         var next: ActionNode? = null,
-        var interrupt: Boolean = false)
+        var interceptor: ActionRunner? = null)
