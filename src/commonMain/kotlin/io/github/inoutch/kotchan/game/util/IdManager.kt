@@ -1,11 +1,12 @@
 package io.github.inoutch.kotchan.game.util
 
 class IdManager {
-    private var nextId = 0L
+    var nextId = 0L
+        private set
 
     fun nextId() = nextId++
 
-    fun reset() {
-        nextId = 0
+    fun reset(id: Long = 0L) {
+        nextId = id
     }
 }
