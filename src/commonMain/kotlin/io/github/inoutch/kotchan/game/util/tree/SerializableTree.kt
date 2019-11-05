@@ -64,6 +64,13 @@ class SerializableTree<T> private constructor(initialNodes: List<SerializableNod
         nodes.remove(id)
     }
 
+    fun removeChildren(parentId: Long) {
+        val children = nodesByParent[parentId]
+        nodesByParent[parentId]?.fastForEach {
+
+        }
+    }
+
     fun removeFromParent(parentId: Long, index: Int) {
         nodesByParent[parentId]?.removeAt(index)
     }
