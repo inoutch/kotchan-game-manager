@@ -3,6 +3,8 @@ package io.github.inoutch.kotchan.game.action.runner
 import io.github.inoutch.kotchan.game.action.EventManager.Companion.eventRunnerContextProvider
 import io.github.inoutch.kotchan.game.action.store.EventStore
 import io.github.inoutch.kotchan.game.component.Component
+import io.github.inoutch.kotchan.game.component.ComponentManager.Companion.componentManager
+import io.github.inoutch.kotchan.game.error.ERR_F_MSG_3
 import io.github.inoutch.kotchan.game.error.ERR_F_MSG_5
 import io.github.inoutch.kotchan.game.extension.checkClass
 import kotlin.reflect.KClass
@@ -22,6 +24,11 @@ abstract class EventRunner<T : EventStore, U : Component>(
     val startTime = runtimeStore.startTime
 
     val endTime = runtimeStore.startTime + runtimeStore.eventStore.durationTime
+
+    val component = componentManager.findById(runtimeStore.componentId, componentClass)
+            ?: throw IllegalStateException(ERR_F_MSG_3(componentClass))
+
+    abstract val updatable: Boolean // Immutable
 
     abstract fun start()
 

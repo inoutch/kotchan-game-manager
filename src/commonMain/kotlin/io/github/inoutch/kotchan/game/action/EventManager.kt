@@ -6,9 +6,11 @@ import io.github.inoutch.kotchan.game.action.runner.EventRunner
 import io.github.inoutch.kotchan.game.action.store.EventRuntimeStore
 import io.github.inoutch.kotchan.game.error.ERR_F_MSG_2
 import io.github.inoutch.kotchan.game.extension.className
+import io.github.inoutch.kotchan.game.extension.fastForEach
 import io.github.inoutch.kotchan.game.util.ContextProvider
+import kotlin.math.min
 
-class EventManager : TaskManager.Action {
+class EventManager : TaskManager.Action, TaskManager.Listener {
     companion object {
         val eventRunnerContextProvider = ContextProvider<EventRunnerContext>()
     }
@@ -16,32 +18,51 @@ class EventManager : TaskManager.Action {
     private val factories = mutableMapOf<String, EventRunnerFactory>()
 
     // シリアライズ対象
-    private val runningEvents = mutableMapOf<String, MutableList<EventRunner<*, *>>>()
+    private val eventQueue = mutableMapOf<String, MutableList<EventRunner<*, *>>>()
 
-    fun enqueue(eventRuntimeStore: EventRuntimeStore) {
-        val currentEvents = runningEvents
+    private val eventsSortedByStartTime = mutableListOf<EventRunner<*, *>>()
+
+    private val eventsSortedByEndTime = mutableListOf<EventRunner<*, *>>()
+
+    private val updatableEvents = mutableListOf<EventRunner<*, *>>()
+
+    private var time = 0L
+
+    override fun enqueue(eventRuntimeStore: EventRuntimeStore) {
+        val currentEvents = eventQueue
                 .getOrPut(eventRuntimeStore.componentId) { mutableListOf() }
 
         val factory = factories[eventRuntimeStore.eventStore.factoryClass]
         checkNotNull(factory) { ERR_F_MSG_2(eventRuntimeStore.eventStore.factoryClass, factory) }
 
-        currentEvents.add(factory.create())
+        val runner = eventRunnerContextProvider.run(EventRunnerContext(eventRuntimeStore)) {
+            factory.create()
+        }
+        currentEvents.add(runner)
+        eventsSortedByStartTime.add(runner)
     }
 
-    fun interrupt(componentId: String) {
-        val currentEvents = runningEvents.getValue(componentId)
+    override fun interrupt(componentId: String) {
+        val currentEvents = eventQueue.getValue(componentId)
         currentEvents.first().interrupt()
         currentEvents.clear()
     }
 
-    fun run(currentTime: Long) {
-        for (events in runningEvents.values) {
-            while (events.size >= 2 && currentTime < events.first().endTime) {
-                // イベントが2つ以上で終了時刻を過ぎている場合にイベントを終了させる
-                events.first().end()
-                events.removeAt(0)
+    fun update(currentTime: Long) {
+        time = currentTime
+
+        var updateOnce = true
+        do {
+            var running = endEventRunners()
+
+            if (updateOnce) {
+                updateEventRunners()
+                updateOnce = false
             }
-        }
+
+            running += startEventRunners()
+
+        } while (running > 0)
     }
 
     fun registerFactory(factory: EventRunnerFactory) {
@@ -53,6 +74,94 @@ class EventManager : TaskManager.Action {
     }
 
     override fun checkInterruptsAllowed(componentId: String): Boolean {
-        return runningEvents.getValue(componentId).first().allowInterrupt()
+        return eventQueue.getValue(componentId).first().allowInterrupt()
+    }
+
+    private fun endEventRunners(): Int {
+        val eventRunners = pullEndingEvents()
+        if (eventRunners.isEmpty()) {
+            return 0
+        }
+
+        for (eventRunner in eventRunners) {
+            // EventRunnerの終了
+            eventRunner.end()
+
+            if (eventRunner.updatable) {
+                updatableEvents.remove(eventRunner)
+            }
+            eventQueue.getValue(eventRunner.componentId).remove(eventRunner)
+        }
+        return eventRunners.size
+    }
+
+    private fun startEventRunners(): Int {
+        val eventRunners = pullStartingEvents()
+        if (eventRunners.isEmpty()) {
+            return 0
+        }
+
+        for (eventRunner in eventRunners) {
+            val exists = eventQueue.getValue(eventRunner.componentId)
+
+            eventRunner.start()
+
+            if (eventRunner.endTime <= time && exists.size >= 2) {
+                eventRunner.end()
+                continue
+            }
+
+            if (eventRunner.updatable) {
+                updatableEvents.add(eventRunner)
+            }
+            eventsSortedByEndTime.add(eventRunner)
+        }
+        return eventRunners.size
+    }
+
+    private fun updateEventRunners() {
+        updatableEvents.fastForEach { it.update(ratio(it.runtimeStore)) }
+    }
+
+    private fun pullStartingEvents(): List<EventRunner<*, *>> {
+        var index = 0
+        val buffers = mutableListOf<EventRunner<*, *>>()
+
+        while (index < eventsSortedByStartTime.size) {
+            val buffer = eventsSortedByStartTime[index++]
+            if (buffer.startTime > time) {
+                break
+            }
+            buffers.add(buffer)
+        }
+
+        for (i in 0 until buffers.size) {
+            eventsSortedByStartTime.removeAt(0)
+        }
+        return buffers
+    }
+
+    private fun pullEndingEvents(): List<EventRunner<*, *>> {
+        var skipped = 0
+        val buffers = arrayListOf<EventRunner<*, *>>()
+
+        while (skipped < eventsSortedByEndTime.size) {
+            val buffer = eventsSortedByEndTime[skipped]
+            if (buffer.endTime > time) {
+                break
+            }
+            val exists = eventQueue.getValue(buffer.componentId)
+            if (exists.size < 2) {
+                skipped++
+            } else {
+                eventsSortedByEndTime.removeAt(skipped)
+                buffers.add(buffer)
+            }
+        }
+        return buffers
+    }
+
+    private fun ratio(eventRuntimeStore: EventRuntimeStore): Float {
+        return min(((time - eventRuntimeStore.startTime).toFloat() / eventRuntimeStore.eventStore.durationTime), 1.0f)
     }
 }

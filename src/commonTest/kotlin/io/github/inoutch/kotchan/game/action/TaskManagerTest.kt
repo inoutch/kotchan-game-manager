@@ -7,9 +7,7 @@ import io.github.inoutch.kotchan.game.component.ComponentManager.Companion.compo
 import io.github.inoutch.kotchan.game.test.util.component.CustomComponent
 import io.github.inoutch.kotchan.game.test.util.component.CustomComponentFactory
 import io.github.inoutch.kotchan.game.test.util.component.store.CustomStore
-import kotlin.test.BeforeTest
-import kotlin.test.Test
-import kotlin.test.assertNotNull
+import kotlin.test.*
 
 class TaskManagerTest {
     @BeforeTest
@@ -29,12 +27,47 @@ class TaskManagerTest {
 
         val eventManager = EventManager()
         val taskManager = TaskManager(eventManager)
+        taskManager.addTaskListener(eventManager)
 
         eventManager.registerFactory(Custom1EventRunnerFactory())
         taskManager.registerFactory(Custom1TaskRunnerFactory())
 
-        taskManager.registerComponent(componentId)
+        var isEnded = false
+        val history = mutableListOf<String>()
+        taskManager.registerComponent(componentId, object : TaskManager.ComponentListener {
+            override fun onEnd() {
+                isEnded = true
+            }
+        })
 
-        taskManager.run(componentId, Custom1TaskStore(3))
+        taskManager.run(componentId, Custom1TaskStore("root", 2, 2))
+        taskManager.update(0.4f)
+        eventManager.update(taskManager.currentTime)
+
+        history.add("root:e1:s")
+        assertEquals(history, component.raw.history) // 0.4 [s]
+
+        taskManager.update(0.1f)
+        eventManager.update(taskManager.currentTime)
+
+        history.add("root:e1:e")
+        history.add("root:e2:s")
+        assertEquals(history, component.raw.history) // 0.5 [s,e,s]
+
+        taskManager.update(0.6f)
+        eventManager.update(taskManager.currentTime)
+
+        history.add("root:e2:e")
+        history.add("root-t1:e1:s")
+        assertEquals(history, component.raw.history) // 1.1 [s,e,s,e,s]
+
+        taskManager.update(0.4f)
+        eventManager.update(taskManager.currentTime)
+
+        history.add("root-t1:e1:e")
+        history.add("root-t1:e2:s")
+        assertEquals(history, component.raw.history) // 1.5 [s,e,s,e,s,e,s]
+
+        assertFalse { isEnded }
     }
 }

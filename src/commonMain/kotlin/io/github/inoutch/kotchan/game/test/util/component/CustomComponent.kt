@@ -12,7 +12,7 @@ class CustomComponent : Component() {
 
     var ratio = 0.0f
 
-    val states = mutableListOf<String>()
+    val history = mutableListOf<String>()
 
     var increment = 0
 

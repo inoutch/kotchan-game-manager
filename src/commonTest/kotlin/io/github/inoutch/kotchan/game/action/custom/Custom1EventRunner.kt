@@ -4,23 +4,26 @@ import io.github.inoutch.kotchan.game.action.runner.EventRunner
 import io.github.inoutch.kotchan.game.test.util.component.CustomComponent
 
 class Custom1EventRunner : EventRunner<Custom1EventStore, CustomComponent>(Custom1EventStore::class, CustomComponent::class) {
+    override val updatable = true
+
     override fun start() {
-        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
+        component.raw.history.add("${store.parentName}:${store.eventName}:s")
     }
 
     override fun end() {
-        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
+        component.raw.history.add("${store.parentName}:${store.eventName}:e")
     }
 
     override fun update(ratio: Float) {
-        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
+        component.raw.history.add("${store.parentName}:${store.eventName}:u")
     }
 
     override fun allowInterrupt(): Boolean {
-        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
+        component.raw.history.add("${store.parentName}:${store.eventName}:a")
+        return store.allowInterrupt
     }
 
     override fun interrupt() {
-        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
+        component.raw.history.add("${store.parentName}:${store.eventName}:i")
     }
 }

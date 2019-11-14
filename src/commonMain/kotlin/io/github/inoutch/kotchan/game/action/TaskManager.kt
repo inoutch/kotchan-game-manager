@@ -31,9 +31,16 @@ class TaskManager(val action: Action) {
         fun interrupt(componentId: String)
     }
 
+    interface ComponentListener {
+        fun onEnd()
+    }
+
     interface Action {
         fun checkInterruptsAllowed(componentId: String): Boolean
     }
+
+    val currentTime: Long
+        get() = time
 
     private val listeners = mutableListOf<Listener>()
 
@@ -66,11 +73,11 @@ class TaskManager(val action: Action) {
         factories.clear()
     }
 
-    fun registerComponent(componentId: String) {
+    fun registerComponent(componentId: String, listener: ComponentListener) {
         check(!contexts.containsKey(componentId)) { ERR_V_MSG_1 }
 
         val tree = SerializableTree.create<TaskStore>()
-        val context = ActionComponentContext(tree, mutableListOf(), -1)
+        val context = ActionComponentContext(listener, tree, mutableListOf(), -1)
         contexts[componentId] = context
     }
 
@@ -121,8 +128,10 @@ class TaskManager(val action: Action) {
     fun update(delta: Float) {
         time += (delta * 1000.0f).toLong()
 
-        endEventRuntimeStores()
-        startEventRuntimeStores()
+        do {
+            var running = endEventRuntimeStores()
+            running += startEventRuntimeStores()
+        } while (running > 0)
     }
 
     private fun run(
@@ -169,7 +178,7 @@ class TaskManager(val action: Action) {
             val parent = context.tree[current.parentId]
             if (parent == null) {
                 // 自身がrootであるため処理が終了
-                contexts.remove(componentId)
+                context.listener.onEnd()
                 return
             }
 
@@ -184,10 +193,10 @@ class TaskManager(val action: Action) {
         }
     }
 
-    private fun startEventRuntimeStores() {
+    private fun startEventRuntimeStores(): Int {
         val eventRuntimeStores = pullStartingEvents()
         if (eventRuntimeStores.isEmpty()) {
-            return
+            return 0
         }
 
         for (eventRuntimeStore in eventRuntimeStores) {
@@ -199,18 +208,20 @@ class TaskManager(val action: Action) {
             }
             eventsSortedByEndTime.add(eventRuntimeStore)
         }
+        return eventRuntimeStores.size
     }
 
-    private fun endEventRuntimeStores() {
+    private fun endEventRuntimeStores(): Int {
         val eventRuntimeStores = pullEndingEvents()
         if (eventRuntimeStores.isEmpty()) {
-            return
+            return 0
         }
 
         for (eventRuntimeStore in eventRuntimeStores) {
             // EventRunnerの終了
             endEventRuntimeStore(eventRuntimeStore)
         }
+        return eventRuntimeStores.size
     }
 
     private fun createTaskRunner(componentId: String, taskStore: TaskStore): TaskRunner<*, *> {
