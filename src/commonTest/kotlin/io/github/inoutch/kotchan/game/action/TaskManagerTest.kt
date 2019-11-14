@@ -41,6 +41,7 @@ class TaskManagerTest {
         })
 
         taskManager.run(componentId, Custom1TaskStore("root", 2, 2))
+
         taskManager.update(0.4f)
         eventManager.update(taskManager.currentTime)
 
@@ -69,5 +70,54 @@ class TaskManagerTest {
         assertEquals(history, component.raw.history) // 1.5 [s,e,s,e,s,e,s]
 
         assertFalse { isEnded }
+    }
+
+    @Test
+    fun checkIsEnded() {
+        val componentId = componentManager.createComponent(CustomStore("action"))
+        assertNotNull(componentId)
+
+        val component = componentManager.findById(componentId, CustomComponent::class)
+        assertNotNull(component)
+
+        val eventManager = EventManager()
+        val taskManager = TaskManager(eventManager)
+        taskManager.addTaskListener(eventManager)
+
+        eventManager.registerFactory(Custom1EventRunnerFactory())
+        taskManager.registerFactory(Custom1TaskRunnerFactory())
+
+        var isEnded = false
+        taskManager.registerComponent(componentId, object : TaskManager.ComponentListener {
+            override fun onEnd() {
+                isEnded = true
+            }
+        })
+
+        taskManager.run(componentId, Custom1TaskStore("root", 2, 3))
+        // T1
+        // ├ E1
+        // ├ E2
+        // ├ E3
+        // ├ T1-1
+        // │ ├ E1
+        // │ ├ E2
+        // │ └ E3
+        // ├ E1
+        // ├ E2
+        // ├ E3
+        // ├ T1-2
+        // │ ├ E1
+        // │ ├ E2
+        // │ └ E3
+        // ├ E1
+        // ├ E2
+        // └ E3
+        // T: 3, E: 15, Time: 0.5 * 15 = 7.5
+
+        taskManager.update(7.4f)
+        assertFalse { isEnded }
+        taskManager.update(0.1f)
+        assertTrue { isEnded }
     }
 }

@@ -36,7 +36,7 @@ class SerializableTree<T> private constructor(initialNodes: List<SerializableNod
     }
 
     fun get(id: Long, childIndex: Int): SerializableNode<T>? {
-        return nodesByParent[id]?.get(childIndex)
+        return nodesByParent.getValue(id).getOrNull(childIndex)
     }
 
     fun add(value: T, parentId: Long = -1, id: Long? = null): SerializableNode<T> {
@@ -65,14 +65,11 @@ class SerializableTree<T> private constructor(initialNodes: List<SerializableNod
     }
 
     fun removeChildren(parentId: Long) {
-        val children = nodesByParent[parentId]
-        nodesByParent[parentId]?.fastForEach {
-
-        }
+        nodesByParent.getValue(parentId).clear()
     }
 
     fun removeFromParent(parentId: Long, index: Int) {
-        nodesByParent[parentId]?.removeAt(index)
+        nodesByParent.getValue(parentId).removeAt(index)
     }
 
     fun toArray(): List<SerializableNode<T>> {
