@@ -19,8 +19,10 @@ import io.github.inoutch.kotchan.game.util.ContextProvider
 import io.github.inoutch.kotchan.game.util.IdManager
 import io.github.inoutch.kotchan.game.util.tree.SerializableNode
 import io.github.inoutch.kotchan.game.util.tree.SerializableTree
+import kotlin.native.concurrent.ThreadLocal
 
 class TaskManager(val action: Action) {
+    @ThreadLocal
     companion object {
         val taskRunnerContextProvider = ContextProvider<TaskRunnerContext>()
     }
@@ -54,7 +56,7 @@ class TaskManager(val action: Action) {
 
     private val eventsSortedByEndTime = arrayListOf<EventRuntimeStore>()
 
-    //-- シリアライズ対象 --
+    // -- シリアライズ対象 --
     private val contexts = mutableMapOf<String, ActionComponentContext>()
 
     fun addTaskListener(listener: Listener) {
@@ -135,10 +137,11 @@ class TaskManager(val action: Action) {
     }
 
     private fun run(
-            componentId: String,
-            context: ActionComponentContext,
-            root: SerializableNode<TaskStore>,
-            startTime: Long = this.time) {
+        componentId: String,
+        context: ActionComponentContext,
+        root: SerializableNode<TaskStore>,
+        startTime: Long = this.time
+    ) {
         val queue = mutableListOf(root)
 
         while (queue.isNotEmpty()) {
@@ -236,17 +239,19 @@ class TaskManager(val action: Action) {
     }
 
     private fun createEventRuntimeStore(
-            componentId: String,
-            eventStore: EventStore,
-            startTime: Long): EventRuntimeStore {
+        componentId: String,
+        eventStore: EventStore,
+        startTime: Long
+    ): EventRuntimeStore {
         return EventRuntimeStore(componentId, idManager.nextId(), startTime, eventStore)
     }
 
     private fun attachEventRunners(
-            context: ActionComponentContext,
-            componentId: String,
-            eventStores: List<EventStore>,
-            time: Long) {
+        context: ActionComponentContext,
+        componentId: String,
+        eventStores: List<EventStore>,
+        time: Long
+    ) {
         var startTime = time
 
         eventStores.fastForEach {

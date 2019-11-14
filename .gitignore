@@ -69,3 +69,5 @@ gradle-app.setting
 local.properties
 .idea
 *.iml
+
+classes

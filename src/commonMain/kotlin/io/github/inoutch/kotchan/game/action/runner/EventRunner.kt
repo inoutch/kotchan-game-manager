@@ -10,8 +10,9 @@ import io.github.inoutch.kotchan.game.extension.checkClass
 import kotlin.reflect.KClass
 
 abstract class EventRunner<T : EventStore, U : Component>(
-        eventClass: KClass<T>,
-        componentClass: KClass<U>) : ActionRunner {
+    eventClass: KClass<T>,
+    componentClass: KClass<U>
+) : ActionRunner {
     val runtimeStore = eventRunnerContextProvider.current.eventRuntimeStore
 
     val store = runtimeStore.eventStore.checkClass(eventClass)

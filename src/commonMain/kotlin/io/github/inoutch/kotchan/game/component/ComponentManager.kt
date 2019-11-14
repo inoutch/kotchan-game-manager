@@ -1,13 +1,15 @@
 package io.github.inoutch.kotchan.game.component
 
-import io.github.inoutch.kotchan.game.extension.className
 import io.github.inoutch.kotchan.game.component.group.ComponentGroup
 import io.github.inoutch.kotchan.game.component.group.ComponentGroupByLabel
-import io.github.inoutch.kotchan.game.extension.checkClass
-import io.github.inoutch.kotchan.game.extension.filterIsInstance
 import io.github.inoutch.kotchan.game.component.store.Store
-import io.github.inoutch.kotchan.game.error.*
+import io.github.inoutch.kotchan.game.error.ERR_F_MSG_1
+import io.github.inoutch.kotchan.game.error.ERR_V_MSG_4
+import io.github.inoutch.kotchan.game.error.ERR_V_MSG_5
+import io.github.inoutch.kotchan.game.extension.checkClass
+import io.github.inoutch.kotchan.game.extension.className
 import io.github.inoutch.kotchan.game.extension.fastForEach
+import io.github.inoutch.kotchan.game.extension.filterIsInstance
 import io.github.inoutch.kotchan.game.util.ContextProvider
 import kotlin.math.min
 import kotlin.native.concurrent.ThreadLocal
@@ -98,9 +100,10 @@ class ComponentManager {
     }
 
     fun <T : Component> createComponentGroupByLabel(
-            filterClass: KClass<T>,
-            label: String,
-            parentId: String = ""): ComponentAccessor<ComponentGroup<T>> {
+        filterClass: KClass<T>,
+        label: String,
+        parentId: String = ""
+    ): ComponentAccessor<ComponentGroup<T>> {
         val components = componentsByLabels[label]
                 ?.filterIsInstance(filterClass)
                 ?.filter { it.lifecycle == ComponentLifecycle.UPDATE } ?: emptyList()
@@ -113,8 +116,9 @@ class ComponentManager {
     }
 
     fun createComponentsIntermittently(
-            stores: List<Store>,
-            activated: () -> Unit = this.activated ?: throw IllegalStateException(ERR_V_MSG_4)) {
+        stores: List<Store>,
+        activated: () -> Unit = this.activated ?: throw IllegalStateException(ERR_V_MSG_4)
+    ) {
         this.activated = activated
         waitingComponentStores.addAll(stores.toMutableList())
     }

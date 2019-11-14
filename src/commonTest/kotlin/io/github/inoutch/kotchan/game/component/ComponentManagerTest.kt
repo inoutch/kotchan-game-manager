@@ -1,10 +1,18 @@
 package io.github.inoutch.kotchan.game.component
 
 import io.github.inoutch.kotchan.game.component.ComponentManager.Companion.componentManager
-import io.github.inoutch.kotchan.game.test.util.component.*
-import io.github.inoutch.kotchan.game.test.util.component.store.*
+import io.github.inoutch.kotchan.game.test.util.component.CustomChildComponent
+import io.github.inoutch.kotchan.game.test.util.component.CustomChildComponentFactory
+import io.github.inoutch.kotchan.game.test.util.component.CustomComponent
+import io.github.inoutch.kotchan.game.test.util.component.CustomComponentFactory
+import io.github.inoutch.kotchan.game.test.util.component.CustomNoUpdateComponentFactory
+import io.github.inoutch.kotchan.game.test.util.component.store.CustomStore
 import io.github.inoutch.kotchan.game.util.Mock
-import kotlin.test.*
+import kotlin.test.BeforeTest
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 
 class ComponentManagerTest {
     @BeforeTest

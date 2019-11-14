@@ -4,8 +4,8 @@ import io.github.inoutch.kotchan.game.action.factory.EventRunnerFactory
 import io.github.inoutch.kotchan.game.action.factory.TaskRunnerFactory
 import io.github.inoutch.kotchan.game.component.Component
 import io.github.inoutch.kotchan.game.component.ComponentFactory
-//import io.github.inoutch.kotchan.game.action.task.TaskRunnerFactory
-//import io.github.inoutch.kotchan.game.action.event.EventRunnerFactory
+// import io.github.inoutch.kotchan.game.action.task.TaskRunnerFactory
+// import io.github.inoutch.kotchan.game.action.event.EventRunnerFactory
 import io.github.inoutch.kotchan.game.extension.className
 import kotlin.reflect.KClass
 

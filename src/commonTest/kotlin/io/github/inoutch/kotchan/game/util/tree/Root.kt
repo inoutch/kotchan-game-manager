@@ -4,4 +4,3 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class Root(val array: List<SerializableNode<String>>)
-

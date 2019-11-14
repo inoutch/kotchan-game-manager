@@ -29,6 +29,10 @@ repositories {
     maven { url "https://kotlin.bintray.com/kotlinx" }
 }
 
+configurations {
+    ktlint
+}
+
 // common
 apply plugin: "kotlin-multiplatform"
 apply plugin: "com.android.library"
@@ -99,6 +103,13 @@ kotlin {
                 implementation "org.jetbrains.kotlinx:kotlinx-serialization-runtime:$kotlin_serialization_version"
             }
         }
+        androidTest {
+            dependencies {
+                implementation "org.jetbrains.kotlin:kotlin-test:$kotlin_version"
+                implementation "org.jetbrains.kotlin:kotlin-test-junit:$kotlin_version"
+                implementation "org.jetbrains.kotlin:kotlin-reflect:$kotlin_version"
+            }
+        }
     }
 }
 
@@ -121,4 +132,23 @@ android {
 def repo = new File(rootDir, "repository")
 publishing.repositories.maven {
     url "file://${repo.absolutePath}"
+}
+
+dependencies {
+    ktlint "com.pinterest:ktlint:0.35.0"
+}
+
+task ktlint(type: JavaExec, group: "verification") {
+    description = "Check Kotlin code style."
+    classpath = configurations.ktlint
+    main = "com.pinterest.ktlint.Main"
+    args "src/**/*.kt"
+}
+check.dependsOn ktlint
+
+task ktlintFormat(type: JavaExec, group: "formatting") {
+    description = "Fix Kotlin code style deviations."
+    classpath = configurations.ktlint
+    main = "com.pinterest.ktlint.Main"
+    args "-F", "src/**/*.kt"
 }

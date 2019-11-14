@@ -1,9 +1,8 @@
 package io.github.inoutch.kotchan.game.util.tree
 
-import kotlinx.serialization.protobuf.ProtoBuf
 import kotlin.test.Test
 import kotlin.test.assertEquals
-
+import kotlinx.serialization.protobuf.ProtoBuf
 
 class SerializableTreeTest {
     @Test

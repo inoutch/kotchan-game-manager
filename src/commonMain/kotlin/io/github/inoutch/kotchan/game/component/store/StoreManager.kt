@@ -1,6 +1,7 @@
 package io.github.inoutch.kotchan.game.component.store
 
 import io.github.inoutch.kotchan.game.component.ComponentManager.Companion.componentManager
+import kotlin.native.concurrent.ThreadLocal
 import kotlinx.serialization.Polymorphic
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -8,7 +9,6 @@ import kotlinx.serialization.json.JsonConfiguration
 import kotlinx.serialization.modules.PolymorphicModuleBuilder
 import kotlinx.serialization.modules.SerialModule
 import kotlinx.serialization.modules.SerializersModule
-import kotlin.native.concurrent.ThreadLocal
 
 @Serializable
 class RootStore(val stores: List<StoreWrapper>)

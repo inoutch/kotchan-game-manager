@@ -1,10 +1,10 @@
 package io.github.inoutch.kotchan.game.serialization
 
+import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.modules.SerializersModule
-import kotlin.test.Test
-import kotlin.test.assertEquals
 
 class SerializationTest {
     @Test

@@ -7,7 +7,12 @@ import io.github.inoutch.kotchan.game.component.ComponentManager.Companion.compo
 import io.github.inoutch.kotchan.game.test.util.component.CustomComponent
 import io.github.inoutch.kotchan.game.test.util.component.CustomComponentFactory
 import io.github.inoutch.kotchan.game.test.util.component.store.CustomStore
-import kotlin.test.*
+import kotlin.test.BeforeTest
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 class TaskManagerTest {
     @BeforeTest

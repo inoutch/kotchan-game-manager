@@ -43,14 +43,14 @@ class SerializableTree<T> private constructor(initialNodes: List<SerializableNod
         if (parentId == -1L) {
             check(nodes.isEmpty()) { "A root node has already been added." }
         } else {
-            check(nodes.contains(parentId)) { "Parent node is not added. [ID = ${parentId}]" }
+            check(nodes.contains(parentId)) { "Parent node is not added. [ID = $parentId]" }
         }
 
         var nextId = id
         if (nextId == null) {
             nextId = idManager.nextId()
         } else {
-            check(nextId >= idManager.nextId) { "Manually added id must set a value greater than the managed id. [Manually id = ${nextId}, managed id ${idManager.nextId}]" }
+            check(nextId >= idManager.nextId) { "Manually added id must set a value greater than the managed id. [Manually id = $nextId, managed id ${idManager.nextId}]" }
             idManager.reset(nextId)
         }
         val node = SerializableNode(nextId, value, parentId)

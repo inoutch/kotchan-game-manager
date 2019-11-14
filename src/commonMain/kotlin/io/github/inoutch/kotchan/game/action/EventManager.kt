@@ -9,8 +9,10 @@ import io.github.inoutch.kotchan.game.extension.className
 import io.github.inoutch.kotchan.game.extension.fastForEach
 import io.github.inoutch.kotchan.game.util.ContextProvider
 import kotlin.math.min
+import kotlin.native.concurrent.ThreadLocal
 
 class EventManager : TaskManager.Action, TaskManager.Listener {
+    @ThreadLocal
     companion object {
         val eventRunnerContextProvider = ContextProvider<EventRunnerContext>()
     }
@@ -61,7 +63,6 @@ class EventManager : TaskManager.Action, TaskManager.Listener {
             }
 
             running += startEventRunners()
-
         } while (running > 0)
     }
 

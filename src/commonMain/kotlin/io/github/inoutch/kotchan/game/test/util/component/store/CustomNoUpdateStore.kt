@@ -1,6 +1,6 @@
 package io.github.inoutch.kotchan.game.test.util.component.store
 
-import io.github.inoutch.kotchan.game.component.store.*
+import io.github.inoutch.kotchan.game.component.store.Store
 import io.github.inoutch.kotchan.game.extension.className
 import io.github.inoutch.kotchan.game.test.util.component.CustomNoUpdateComponentFactory
 import kotlinx.serialization.Serializable

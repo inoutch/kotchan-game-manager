@@ -1,7 +1,12 @@
 package io.github.inoutch.kotchan.game.component
 
 import io.github.inoutch.kotchan.game.component.ComponentManager.Companion.componentManager
-import io.github.inoutch.kotchan.game.test.util.component.*
+import io.github.inoutch.kotchan.game.test.util.component.CustomChildComponent
+import io.github.inoutch.kotchan.game.test.util.component.CustomChildComponentFactory
+import io.github.inoutch.kotchan.game.test.util.component.CustomComponent
+import io.github.inoutch.kotchan.game.test.util.component.CustomComponentFactory
+import io.github.inoutch.kotchan.game.test.util.component.CustomNoUpdateComponent
+import io.github.inoutch.kotchan.game.test.util.component.CustomNoUpdateComponentFactory
 import io.github.inoutch.kotchan.game.test.util.component.store.CustomChildStore
 import io.github.inoutch.kotchan.game.test.util.component.store.CustomNoUpdateStore
 import io.github.inoutch.kotchan.game.test.util.component.store.CustomStore

@@ -8,8 +8,9 @@ import io.github.inoutch.kotchan.game.extension.checkClass
 import kotlin.reflect.KClass
 
 abstract class ComponentGroup<T : Component>(
-        private val kClass: KClass<T>,
-        components: List<T>) : Component(), ComponentLifecycleListener<T> {
+    private val kClass: KClass<T>,
+    components: List<T>
+) : Component(), ComponentLifecycleListener<T> {
 
     init {
         // CAUTION: CALL BEFORE CREATE FUNC

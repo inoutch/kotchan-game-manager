@@ -12,8 +12,9 @@ import io.github.inoutch.kotchan.game.extension.checkClass
 import kotlin.reflect.KClass
 
 abstract class TaskRunner<T : TaskStore, U : Component>(
-        taskClass: KClass<T>,
-        componentClass: KClass<U>) : ActionRunner {
+    taskClass: KClass<T>,
+    componentClass: KClass<U>
+) : ActionRunner {
 
     val runtimeStore = taskRunnerContextProvider.current.taskRuntimeStore
 
