@@ -11,10 +11,9 @@ import io.github.inoutch.kotchan.game.test.util.component.store.CustomStore
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
-import kotlinx.serialization.protobuf.ProtoBuf
+import kotlinx.serialization.json.Json
 
 class SerializationTest {
     @BeforeTest
@@ -26,34 +25,62 @@ class SerializationTest {
 
     @Test
     fun checkSerializableServer() {
-        val targetComponentId = componentManager.createComponent(CustomStore("action"))
-        assertNotNull(targetComponentId)
+        val component1Store = CustomStore("action")
 
-        val component = componentManager.findById(targetComponentId, CustomComponent::class)
-        assertNotNull(component)
+        val component1Id = componentManager.createComponent(component1Store)
+        assertNotNull(component1Id)
 
-        var isEnded = false
-        val taskManager = TaskManager(object : TaskManager.Action {
+        val component1 = componentManager.findById(component1Id, CustomComponent::class)
+        assertNotNull(component1)
+
+        var expectIsEnded = false
+        val expectedTaskManager = TaskManager(object : TaskManager.Action {
             override fun onEnd(componentId: String, rootTaskRunner: TaskRunner<*, *>) {
-                isEnded = true
-                assertEquals(componentId, targetComponentId)
+                expectIsEnded = true
             }
         })
+        expectedTaskManager.registerFactory(Custom1TaskRunnerFactory())
+        expectedTaskManager.registerComponent(component1Id)
 
-        taskManager.registerFactory(Custom1TaskRunnerFactory())
-        taskManager.registerComponent(targetComponentId)
-
-        taskManager.run(targetComponentId, Custom1TaskStore("root", 2, 3))
-        val data = taskManager.serialize()
+        expectedTaskManager.run(component1Id, Custom1TaskStore("root", 2, 3))
+        val data = expectedTaskManager.serialize()
 
         val module = SerialModule.generate({
             Custom1TaskStore::class with Custom1TaskStore.serializer()
         }, {
             Custom1EventStore::class with Custom1EventStore.serializer()
         })
-        val protoBuf = ProtoBuf(context = module)
-        val bytes = protoBuf.dump(TaskManager.InitData.serializer(), data)
+        val protoBuf = Json(context = module)
+        val bytes = protoBuf.stringify(TaskManager.InitData.serializer(), data)
         assertTrue { bytes.isNotEmpty() }
-        assertFalse { isEnded }
+
+        expectedTaskManager.update(7.4f)
+        componentManager.destroyAllComponents()
+
+        var actualIsEnded = false
+        val actualInitData = protoBuf.parse(TaskManager.InitData.serializer(), bytes)
+        val actualTaskManager = TaskManager(object : TaskManager.Action {
+            override fun onEnd(componentId: String, rootTaskRunner: TaskRunner<*, *>) {
+                actualIsEnded = true
+            }
+        }, actualInitData)
+
+        val component2Id = componentManager.createComponent(component1Store)
+        assertNotNull(component2Id)
+
+        val component2 = componentManager.findById(component2Id, CustomComponent::class)
+        assertNotNull(component2)
+
+        actualTaskManager.registerFactory(Custom1TaskRunnerFactory())
+//        actualTaskManager.registerComponent(component2Id)
+
+        actualTaskManager.update(7.4f)
+        assertEquals(component1.raw.history, component2.raw.history)
+        assertEquals(expectIsEnded, actualIsEnded)
+
+        expectedTaskManager.update(0.1f)
+        actualTaskManager.update(0.1f)
+        assertEquals(component1.raw.history, component2.raw.history)
+        assertEquals(expectIsEnded, actualIsEnded)
     }
 }

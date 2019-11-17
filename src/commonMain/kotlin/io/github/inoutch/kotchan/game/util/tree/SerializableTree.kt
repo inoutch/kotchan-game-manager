@@ -20,7 +20,7 @@ class SerializableTree<T> private constructor(initialNodes: List<SerializableNod
         get() = nodes.size
 
     init {
-        var maxId = 0L
+        var maxId = -1L
         initialNodes.fastForEach {
             nodes[it.id] = it
             if (maxId < it.id) {
@@ -28,7 +28,7 @@ class SerializableTree<T> private constructor(initialNodes: List<SerializableNod
             }
             nodesByParent.getOrPut(it.parentId) { mutableListOf() }.add(it)
         }
-        idManager.reset(maxId)
+        idManager.reset(maxId + 1)
     }
 
     operator fun get(id: Long): SerializableNode<T>? {
