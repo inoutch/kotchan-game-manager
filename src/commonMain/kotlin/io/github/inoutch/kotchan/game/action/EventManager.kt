@@ -10,6 +10,7 @@ import io.github.inoutch.kotchan.game.extension.fastForEach
 import io.github.inoutch.kotchan.game.util.ContextProvider
 import kotlin.math.min
 import kotlin.native.concurrent.ThreadLocal
+import kotlinx.serialization.Serializable
 
 class EventManager : TaskManager.Listener {
     @ThreadLocal
@@ -17,9 +18,17 @@ class EventManager : TaskManager.Listener {
         val eventRunnerContextProvider = ContextProvider<EventRunnerContext>()
     }
 
+    @Serializable
+    class Store(val events: List<EventRuntimeStore>) {
+        companion object {
+            fun create(): Store {
+                return Store(emptyList())
+            }
+        }
+    }
+
     private val factories = mutableMapOf<String, EventRunnerFactory>()
 
-    // シリアライズ対象
     private val eventQueue = mutableMapOf<String, MutableList<EventRunner<*, *>>>()
 
     private val eventsSortedByStartTime = mutableListOf<EventRunner<*, *>>()
@@ -29,6 +38,20 @@ class EventManager : TaskManager.Listener {
     private val updatableEvents = mutableListOf<EventRunner<*, *>>()
 
     private var time = 0L
+
+    fun store(): Store {
+        return Store((eventsSortedByStartTime + eventsSortedByEndTime).map { it.runtimeStore })
+    }
+
+    fun restore(store: Store) {
+        eventQueue.clear()
+        eventsSortedByStartTime.clear()
+        eventsSortedByEndTime.clear()
+        updatableEvents.clear()
+
+        store.events.fastForEach { enqueue(it) }
+        startEventRunners(true)
+    }
 
     override fun enqueue(eventRuntimeStore: EventRuntimeStore) {
         val currentEvents = eventQueue
@@ -92,7 +115,7 @@ class EventManager : TaskManager.Listener {
         return eventRunners.size
     }
 
-    private fun startEventRunners(): Int {
+    private fun startEventRunners(skipOlderEventStarting: Boolean = false): Int {
         val eventRunners = pullStartingEvents()
         if (eventRunners.isEmpty()) {
             return 0
@@ -101,7 +124,9 @@ class EventManager : TaskManager.Listener {
         for (eventRunner in eventRunners) {
             val exists = eventQueue.getValue(eventRunner.componentId)
 
-            eventRunner.start()
+            if (!skipOlderEventStarting || time == eventRunner.startTime) {
+                eventRunner.start()
+            }
 
             if (eventRunner.endTime <= time && exists.size >= 2) {
                 eventRunner.end()

@@ -24,7 +24,7 @@ class TaskManagerTest {
     }
 
     @Test
-    fun checkStandard() {
+    fun checkIntegration() {
         val componentId = componentManager.createComponent(CustomStore("action"))
         assertNotNull(componentId)
 
