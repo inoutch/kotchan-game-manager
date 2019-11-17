@@ -18,11 +18,6 @@ class Custom1EventRunner : EventRunner<Custom1EventStore, CustomComponent>(Custo
         component.raw.history.add("${store.parentName}:${store.eventName}:u")
     }
 
-    override fun allowInterrupt(): Boolean {
-        component.raw.history.add("${store.parentName}:${store.eventName}:a")
-        return store.allowInterrupt
-    }
-
     override fun interrupt() {
         component.raw.history.add("${store.parentName}:${store.eventName}:i")
     }

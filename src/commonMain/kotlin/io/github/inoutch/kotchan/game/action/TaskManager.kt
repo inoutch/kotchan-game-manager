@@ -3,6 +3,7 @@ package io.github.inoutch.kotchan.game.action
 import io.github.inoutch.kotchan.game.action.builder.EventBuilder
 import io.github.inoutch.kotchan.game.action.builder.TaskBuilder
 import io.github.inoutch.kotchan.game.action.context.ActionComponentContext
+import io.github.inoutch.kotchan.game.action.context.ActionComponentInitContext
 import io.github.inoutch.kotchan.game.action.context.TaskRunnerContext
 import io.github.inoutch.kotchan.game.action.factory.TaskRunnerFactory
 import io.github.inoutch.kotchan.game.action.runner.TaskRunner
@@ -20,8 +21,9 @@ import io.github.inoutch.kotchan.game.util.IdManager
 import io.github.inoutch.kotchan.game.util.tree.SerializableNode
 import io.github.inoutch.kotchan.game.util.tree.SerializableTree
 import kotlin.native.concurrent.ThreadLocal
+import kotlinx.serialization.Serializable
 
-class TaskManager(val action: Action) {
+class TaskManager(val action: Action, initData: InitData = InitData.create()) {
     @ThreadLocal
     companion object {
         val taskRunnerContextProvider = ContextProvider<TaskRunnerContext>()
@@ -33,12 +35,23 @@ class TaskManager(val action: Action) {
         fun interrupt(componentId: String)
     }
 
-    interface ComponentListener {
-        fun onEnd()
+    interface Action {
+        fun onEnd(componentId: String, rootTaskRunner: TaskRunner<*, *>)
     }
 
-    interface Action {
-        fun checkInterruptsAllowed(componentId: String): Boolean
+    @Serializable
+    class InitData(
+        val resetId: Long,
+        val currentTime: Long,
+        val eventSortedByStartTime: Array<EventRuntimeStore>,
+        val eventsSortedByEndTime: Array<EventRuntimeStore>,
+        val contexts: Map<String, ActionComponentInitContext>
+    ) {
+        companion object {
+            fun create(): InitData {
+                return InitData(0, 0, emptyArray(), emptyArray(), emptyMap())
+            }
+        }
     }
 
     val currentTime: Long
@@ -50,14 +63,21 @@ class TaskManager(val action: Action) {
 
     private val idManager = IdManager()
 
-    private var time = 0L
+    private var time = initData.currentTime
 
-    private val eventsSortedByStartTime = arrayListOf<EventRuntimeStore>()
+    private val eventsSortedByStartTime = initData.eventSortedByStartTime.toCollection(ArrayList())
 
-    private val eventsSortedByEndTime = arrayListOf<EventRuntimeStore>()
+    private val eventsSortedByEndTime = initData.eventsSortedByEndTime.toCollection(ArrayList())
 
     // -- シリアライズ対象 --
-    private val contexts = mutableMapOf<String, ActionComponentContext>()
+    private val contexts = initData.contexts
+            .map { it.key to ActionComponentContext.create(it.value) }
+            .toMap()
+            .toMutableMap()
+
+    init {
+        idManager.reset(initData.resetId)
+    }
 
     fun addTaskListener(listener: Listener) {
         listeners.add(listener)
@@ -75,11 +95,11 @@ class TaskManager(val action: Action) {
         factories.clear()
     }
 
-    fun registerComponent(componentId: String, listener: ComponentListener) {
+    fun registerComponent(componentId: String) {
         check(!contexts.containsKey(componentId)) { ERR_V_MSG_1 }
 
         val tree = SerializableTree.create<TaskStore>()
-        val context = ActionComponentContext(listener, tree, mutableListOf(), -1)
+        val context = ActionComponentContext(tree, mutableListOf(), -1)
         contexts[componentId] = context
     }
 
@@ -108,7 +128,7 @@ class TaskManager(val action: Action) {
         checkNotNull(context)
 
         context.interrupting = true
-        if (action.checkInterruptsAllowed(componentId)) {
+        if (context.eventRuntimeStores.first().eventStore.isInterruptible()) {
             // 直ぐに割り込み可能
             val current = context.tree[context.currentNodeId]
             checkNotNull(current)
@@ -134,6 +154,16 @@ class TaskManager(val action: Action) {
             var running = endEventRuntimeStores()
             running += startEventRuntimeStores()
         } while (running > 0)
+    }
+
+    fun serialize(): InitData {
+        return InitData(
+                idManager.nextId,
+                time,
+                eventsSortedByStartTime.toTypedArray(),
+                eventsSortedByEndTime.toTypedArray(),
+                contexts.map { it.key to ActionComponentInitContext.create(it.value) }
+                        .toMap())
     }
 
     private fun run(
@@ -181,7 +211,7 @@ class TaskManager(val action: Action) {
             val parent = context.tree[current.parentId]
             if (parent == null) {
                 // 自身がrootであるため処理が終了
-                context.listener.onEnd()
+                action.onEnd(componentId, runner)
                 return
             }
 

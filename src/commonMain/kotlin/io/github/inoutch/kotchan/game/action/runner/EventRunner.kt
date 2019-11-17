@@ -36,6 +36,4 @@ abstract class EventRunner<T : EventStore, U : Component>(
     abstract fun end()
 
     abstract fun update(ratio: Float)
-
-    abstract fun allowInterrupt(): Boolean // 即時割り込み可能であればtrue
 }

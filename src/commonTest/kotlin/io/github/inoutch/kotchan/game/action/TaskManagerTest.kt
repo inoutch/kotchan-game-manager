@@ -3,6 +3,7 @@ package io.github.inoutch.kotchan.game.action
 import io.github.inoutch.kotchan.game.action.custom.Custom1EventRunnerFactory
 import io.github.inoutch.kotchan.game.action.custom.Custom1TaskRunnerFactory
 import io.github.inoutch.kotchan.game.action.custom.Custom1TaskStore
+import io.github.inoutch.kotchan.game.action.runner.TaskRunner
 import io.github.inoutch.kotchan.game.component.ComponentManager.Companion.componentManager
 import io.github.inoutch.kotchan.game.test.util.component.CustomComponent
 import io.github.inoutch.kotchan.game.test.util.component.CustomComponentFactory
@@ -30,20 +31,20 @@ class TaskManagerTest {
         val component = componentManager.findById(componentId, CustomComponent::class)
         assertNotNull(component)
 
+        var isEnded = false
         val eventManager = EventManager()
-        val taskManager = TaskManager(eventManager)
+        val taskManager = TaskManager(object : TaskManager.Action {
+            override fun onEnd(componentId: String, rootTaskRunner: TaskRunner<*, *>) {
+                isEnded = true
+            }
+        })
         taskManager.addTaskListener(eventManager)
 
         eventManager.registerFactory(Custom1EventRunnerFactory())
         taskManager.registerFactory(Custom1TaskRunnerFactory())
 
-        var isEnded = false
         val history = mutableListOf<String>()
-        taskManager.registerComponent(componentId, object : TaskManager.ComponentListener {
-            override fun onEnd() {
-                isEnded = true
-            }
-        })
+        taskManager.registerComponent(componentId)
 
         taskManager.run(componentId, Custom1TaskStore("root", 2, 2))
 
@@ -85,19 +86,19 @@ class TaskManagerTest {
         val component = componentManager.findById(componentId, CustomComponent::class)
         assertNotNull(component)
 
+        var isEnded = false
         val eventManager = EventManager()
-        val taskManager = TaskManager(eventManager)
+        val taskManager = TaskManager(object : TaskManager.Action {
+            override fun onEnd(componentId: String, rootTaskRunner: TaskRunner<*, *>) {
+                isEnded = true
+            }
+        })
         taskManager.addTaskListener(eventManager)
 
         eventManager.registerFactory(Custom1EventRunnerFactory())
         taskManager.registerFactory(Custom1TaskRunnerFactory())
 
-        var isEnded = false
-        taskManager.registerComponent(componentId, object : TaskManager.ComponentListener {
-            override fun onEnd() {
-                isEnded = true
-            }
-        })
+        taskManager.registerComponent(componentId)
 
         taskManager.run(componentId, Custom1TaskStore("root", 2, 3))
         // T1

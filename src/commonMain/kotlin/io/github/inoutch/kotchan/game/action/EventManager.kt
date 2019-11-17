@@ -11,7 +11,7 @@ import io.github.inoutch.kotchan.game.util.ContextProvider
 import kotlin.math.min
 import kotlin.native.concurrent.ThreadLocal
 
-class EventManager : TaskManager.Action, TaskManager.Listener {
+class EventManager : TaskManager.Listener {
     @ThreadLocal
     companion object {
         val eventRunnerContextProvider = ContextProvider<EventRunnerContext>()
@@ -72,10 +72,6 @@ class EventManager : TaskManager.Action, TaskManager.Listener {
 
     fun unregisterFactories() {
         factories.clear()
-    }
-
-    override fun checkInterruptsAllowed(componentId: String): Boolean {
-        return eventQueue.getValue(componentId).first().allowInterrupt()
     }
 
     private fun endEventRunners(): Int {

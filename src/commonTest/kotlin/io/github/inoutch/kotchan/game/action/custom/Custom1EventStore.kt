@@ -8,9 +8,11 @@ import kotlinx.serialization.Serializable
 class Custom1EventStore(
     val parentName: String,
     val eventName: String,
-    val allowInterrupt: Boolean,
+    val isInterruptibleVar: Boolean,
     override val durationTime: Long
 ) : EventStore() {
     override val factoryClass: String
         get() = className(Custom1EventRunnerFactory::class)
+
+    override fun isInterruptible() = isInterruptibleVar
 }
