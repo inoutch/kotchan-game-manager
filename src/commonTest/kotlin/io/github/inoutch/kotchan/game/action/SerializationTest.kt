@@ -4,12 +4,6 @@ import io.github.inoutch.kotchan.game.action.custom.Custom1EventStore
 import io.github.inoutch.kotchan.game.action.custom.Custom1TaskRunnerFactory
 import io.github.inoutch.kotchan.game.action.custom.Custom1TaskStore
 import io.github.inoutch.kotchan.game.action.runner.TaskRunner
-import io.github.inoutch.kotchan.game.action.store.ActionRuntimeStore
-import io.github.inoutch.kotchan.game.action.store.ActionStore
-import io.github.inoutch.kotchan.game.action.store.EventRuntimeStore
-import io.github.inoutch.kotchan.game.action.store.EventStore
-import io.github.inoutch.kotchan.game.action.store.TaskRuntimeStore
-import io.github.inoutch.kotchan.game.action.store.TaskStore
 import io.github.inoutch.kotchan.game.component.ComponentManager.Companion.componentManager
 import io.github.inoutch.kotchan.game.test.util.component.CustomComponent
 import io.github.inoutch.kotchan.game.test.util.component.CustomComponentFactory
@@ -17,11 +11,10 @@ import io.github.inoutch.kotchan.game.test.util.component.store.CustomStore
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
-import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.protobuf.ProtoBuf
-import kotlin.test.assertFalse
 
 class SerializationTest {
     @BeforeTest
