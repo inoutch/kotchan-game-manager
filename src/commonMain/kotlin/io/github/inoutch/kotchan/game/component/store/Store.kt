@@ -5,12 +5,11 @@ import kotlinx.serialization.Serializable
 // CAUTION: DO NOT USE `type` PROPERTY FOR KOTLIN SERIALIZATION
 @Serializable
 open class Store {
-    @Suppress("LeakingThis")
     open val factoryType: String = ""
 
     // TODO: Change hash algorithm
     val id: String
-        get() = "component-${this.hashCode()}"
+        get() = "cp-${this.hashCode()}"
 
     // Update after created
     var parentId: String = ""
