@@ -130,6 +130,7 @@ class EventManager : TaskManager.Listener {
 
             if (eventRunner.endTime <= time && exists.size >= 2) {
                 eventRunner.end()
+                exists.remove(eventRunner)
                 continue
             }
 

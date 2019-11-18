@@ -36,4 +36,6 @@ abstract class EventRunner<T : EventStore, U : Component>(
     abstract fun end()
 
     abstract fun update(ratio: Float)
+
+    abstract fun interrupt()
 }

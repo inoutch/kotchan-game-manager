@@ -4,6 +4,4 @@ interface ActionRunner {
     val id: Long
 
     val componentId: String
-
-    fun interrupt()
 }

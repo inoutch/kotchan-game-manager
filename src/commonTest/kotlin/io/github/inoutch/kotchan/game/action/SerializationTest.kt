@@ -51,7 +51,7 @@ class SerializationTest {
         expectedTaskManager.registerFactory(Custom1TaskRunnerFactory())
         expectedTaskManager.registerComponent(component1Id)
 
-        expectedTaskManager.run(component1Id, Custom1TaskStore("root", 2, 3))
+        expectedTaskManager.run(component1Id, Custom1TaskStore("root", 2, 3, false))
         val data = expectedTaskManager.serialize()
         val bytes = protoBuf.stringify(TaskManager.InitData.serializer(), data)
         assertTrue { bytes.isNotEmpty() }
@@ -124,7 +124,7 @@ class SerializationTest {
         // ├ E2
         // └ E3
         // T: 3, E: 15, Time: 0.5 * 15 = 7.5
-        taskManager.run(component1Id, Custom1TaskStore("root", 2, 3))
+        taskManager.run(component1Id, Custom1TaskStore("root", 2, 3, false))
         taskManager.update(7.5f)
 
         val expectedStore = eventManager.store()

@@ -2,16 +2,14 @@ package io.github.inoutch.kotchan.game.action.custom
 
 import io.github.inoutch.kotchan.game.action.store.TaskStore
 import io.github.inoutch.kotchan.game.extension.className
-import kotlinx.serialization.Serializable
 
-@Serializable
-class Custom1TaskStore(
+class Custom2TaskStore(
     val taskName: String,
     val taskSize: Int,
     val eventSize: Int,
     val eventInterruptible: Boolean
 ) : TaskStore() {
-    override val factoryClass = className(Custom1TaskRunnerFactory::class)
+    override val factoryClass = className(Custom2TaskRunnerFactory::class)
 
     var currentTaskSize = 0
 

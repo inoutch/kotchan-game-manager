@@ -127,14 +127,17 @@ class TaskManager(val action: Action, initData: InitData = InitData.create()) {
         val context = contexts[componentId]
         checkNotNull(context)
 
+        val currentEventRunner = context.eventRuntimeStores.firstOrNull() ?: return
+
         context.interrupting = true
-        if (context.eventRuntimeStores.first().eventStore.isInterruptible()) {
+        if (currentEventRunner.eventStore.isInterruptible()) {
             // 直ぐに割り込み可能
             val current = context.tree[context.currentNodeId]
             checkNotNull(current)
 
             listeners.fastForEach { it.interrupt(componentId) }
 
+            eventsSortedByEndTime.remove(currentEventRunner)
             context.eventRuntimeStores.clear()
 
             run(componentId, context, current, this.time)
@@ -142,9 +145,8 @@ class TaskManager(val action: Action, initData: InitData = InitData.create()) {
         }
 
         // 直ぐに割り込みしない場合は通知しない
-        val first = context.eventRuntimeStores.first()
         context.eventRuntimeStores.clear()
-        context.eventRuntimeStores.add(first)
+        context.eventRuntimeStores.add(currentEventRunner)
     }
 
     fun update(delta: Float) {

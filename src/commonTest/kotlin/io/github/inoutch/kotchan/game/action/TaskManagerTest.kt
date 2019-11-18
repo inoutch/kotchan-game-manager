@@ -3,6 +3,8 @@ package io.github.inoutch.kotchan.game.action
 import io.github.inoutch.kotchan.game.action.custom.Custom1EventRunnerFactory
 import io.github.inoutch.kotchan.game.action.custom.Custom1TaskRunnerFactory
 import io.github.inoutch.kotchan.game.action.custom.Custom1TaskStore
+import io.github.inoutch.kotchan.game.action.custom.Custom2TaskRunnerFactory
+import io.github.inoutch.kotchan.game.action.custom.Custom2TaskStore
 import io.github.inoutch.kotchan.game.action.runner.TaskRunner
 import io.github.inoutch.kotchan.game.component.ComponentManager.Companion.componentManager
 import io.github.inoutch.kotchan.game.test.util.component.CustomComponent
@@ -46,7 +48,7 @@ class TaskManagerTest {
         val history = mutableListOf<String>()
         taskManager.registerComponent(componentId)
 
-        taskManager.run(componentId, Custom1TaskStore("root", 2, 2))
+        taskManager.run(componentId, Custom1TaskStore("root", 2, 2, false))
 
         taskManager.update(0.4f)
         eventManager.update(taskManager.currentTime)
@@ -100,7 +102,7 @@ class TaskManagerTest {
 
         taskManager.registerComponent(componentId)
 
-        taskManager.run(componentId, Custom1TaskStore("root", 2, 3))
+        taskManager.run(componentId, Custom1TaskStore("root", 2, 3, false))
         // T1
         // ├ E1
         // ├ E2
@@ -125,5 +127,146 @@ class TaskManagerTest {
         assertFalse { isEnded }
         taskManager.update(0.1f)
         assertTrue { isEnded }
+    }
+
+    @Test
+    fun checkInterruptFalse() {
+        val componentId = componentManager.createComponent(CustomStore("action"))
+        assertNotNull(componentId)
+
+        val component = componentManager.findById(componentId, CustomComponent::class)
+        assertNotNull(component)
+
+        var isEnded = false
+        val taskManager = TaskManager(object : TaskManager.Action {
+            override fun onEnd(componentId: String, rootTaskRunner: TaskRunner<*, *>) {
+                isEnded = true
+            }
+        })
+        taskManager.registerFactory(Custom2TaskRunnerFactory())
+
+        val eventManager = EventManager()
+        eventManager.registerFactory(Custom1EventRunnerFactory())
+        taskManager.addTaskListener(eventManager)
+
+        taskManager.registerComponent(componentId)
+        taskManager.run(componentId, Custom2TaskStore("root", 2, 2, false))
+        // T
+        // ├ E1
+        // ├ E2
+        // ├ T1
+        // │ ├ E1
+        // │ ├ E2
+        // │ ├ T1-1
+        // │ │ ├ E1
+        // │ │ └ E2
+        // │ ├ E1 <--- interrupt
+        // │ └ E2
+        // ├ E1
+        // ├ E2
+        // ├ T2
+        // │ ├ E1
+        // │ ├ E2
+        // │ └ T2-1
+        // │ 　 ├ E1
+        // │ 　 └ E2
+        // ├ E1
+        // └ E2
+        taskManager.update(0.5f * 6 + 0.3f)
+        eventManager.update(taskManager.currentTime)
+
+        assertFalse { isEnded }
+        taskManager.interrupt(componentId)
+        taskManager.update(0.2f)
+        eventManager.update(taskManager.currentTime)
+
+        assertTrue { isEnded }
+        val history = listOf(
+                "root:e1:s",
+                "root:e1:e",
+                "root:e2:s",
+                "root:e2:e",
+                "root-t1:e1:s",
+                "root-t1:e1:e",
+                "root-t1:e2:s",
+                "root-t1:e2:e",
+                "root-t1-t1:e1:s",
+                "root-t1-t1:e1:e",
+                "root-t1-t1:e2:s",
+                "root-t1-t1:e2:e",
+                "root-t1:e1:s",
+                "root-t1:e1:u")
+        assertEquals(history, component.raw.history)
+    }
+
+    @Test
+    fun checkInterruptTrue() {
+        val componentId = componentManager.createComponent(CustomStore("action"))
+        assertNotNull(componentId)
+
+        val component = componentManager.findById(componentId, CustomComponent::class)
+        assertNotNull(component)
+
+        var isEnded = false
+        val taskManager = TaskManager(object : TaskManager.Action {
+            override fun onEnd(componentId: String, rootTaskRunner: TaskRunner<*, *>) {
+                isEnded = true
+            }
+        })
+        taskManager.registerFactory(Custom2TaskRunnerFactory())
+
+        val eventManager = EventManager()
+        eventManager.registerFactory(Custom1EventRunnerFactory())
+        taskManager.addTaskListener(eventManager)
+
+        taskManager.registerComponent(componentId)
+        taskManager.run(componentId, Custom2TaskStore("root", 2, 2, true))
+        // T
+        // ├ E1
+        // ├ E2
+        // ├ T1
+        // │ ├ E1
+        // │ ├ E2
+        // │ ├ T1-1
+        // │ │ ├ E1
+        // │ │ └ E2
+        // │ ├ E1 <--- interrupt
+        // │ └ E2
+        // ├ E1
+        // ├ E2
+        // ├ T2
+        // │ ├ E1
+        // │ ├ E2
+        // │ └ T2-1
+        // │ 　 ├ E1
+        // │ 　 └ E2
+        // ├ E1
+        // └ E2
+        taskManager.update(0.5f * 6 + 0.3f)
+        eventManager.update(taskManager.currentTime)
+
+        assertFalse { isEnded }
+        taskManager.interrupt(componentId)
+        taskManager.update(0.2f)
+        eventManager.update(taskManager.currentTime)
+
+        assertTrue { isEnded }
+        val history = listOf(
+                "root:e1:s",
+                "root:e1:e",
+                "root:e2:s",
+                "root:e2:e",
+                "root-t1:e1:s",
+                "root-t1:e1:e",
+                "root-t1:e2:s",
+                "root-t1:e2:e",
+                "root-t1-t1:e1:s",
+                "root-t1-t1:e1:e",
+                "root-t1-t1:e2:s",
+                "root-t1-t1:e2:e",
+                "root-t1:e1:s",
+                "root-t1:e1:i",
+                "root-t1:e1:u")
+        assertEquals(history, component.raw.history)
     }
 }
