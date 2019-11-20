@@ -12,7 +12,7 @@ import kotlin.math.min
 import kotlin.native.concurrent.ThreadLocal
 import kotlinx.serialization.Serializable
 
-class EventManager : TaskManager.Listener {
+class EventManager : TaskManager.EventListener {
     @ThreadLocal
     companion object {
         val eventRunnerContextProvider = ContextProvider<EventRunnerContext>()

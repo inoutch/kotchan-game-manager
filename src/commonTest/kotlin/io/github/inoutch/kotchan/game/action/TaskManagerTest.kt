@@ -35,7 +35,8 @@ class TaskManagerTest {
 
         var isEnded = false
         val eventManager = EventManager()
-        val taskManager = TaskManager(object : TaskManager.Action {
+        val taskManager = TaskManager()
+        taskManager.addComponentListener(componentId, object : TaskManager.ComponentListener {
             override fun onEnd(componentId: String, rootTaskRunner: TaskRunner<*, *>) {
                 isEnded = true
             }
@@ -90,7 +91,8 @@ class TaskManagerTest {
 
         var isEnded = false
         val eventManager = EventManager()
-        val taskManager = TaskManager(object : TaskManager.Action {
+        val taskManager = TaskManager()
+        taskManager.addComponentListener(componentId, object : TaskManager.ComponentListener {
             override fun onEnd(componentId: String, rootTaskRunner: TaskRunner<*, *>) {
                 isEnded = true
             }
@@ -138,7 +140,8 @@ class TaskManagerTest {
         assertNotNull(component)
 
         var isEnded = false
-        val taskManager = TaskManager(object : TaskManager.Action {
+        val taskManager = TaskManager()
+        taskManager.addComponentListener(componentId, object : TaskManager.ComponentListener {
             override fun onEnd(componentId: String, rootTaskRunner: TaskRunner<*, *>) {
                 isEnded = true
             }
@@ -208,7 +211,8 @@ class TaskManagerTest {
         assertNotNull(component)
 
         var isEnded = false
-        val taskManager = TaskManager(object : TaskManager.Action {
+        val taskManager = TaskManager()
+        taskManager.addComponentListener(componentId, object : TaskManager.ComponentListener {
             override fun onEnd(componentId: String, rootTaskRunner: TaskRunner<*, *>) {
                 isEnded = true
             }

@@ -8,7 +8,7 @@ open class Store {
     open val factoryType: String = ""
 
     // TODO: Change hash algorithm
-    val id: String
+    open val id: String
         get() = "cp-${this.hashCode()}"
 
     // Update after created

@@ -23,19 +23,19 @@ import io.github.inoutch.kotchan.game.util.tree.SerializableTree
 import kotlin.native.concurrent.ThreadLocal
 import kotlinx.serialization.Serializable
 
-class TaskManager(val action: Action, initData: InitData = InitData.create()) {
+class TaskManager(initData: InitData = InitData.create()) {
     @ThreadLocal
     companion object {
         val taskRunnerContextProvider = ContextProvider<TaskRunnerContext>()
     }
 
-    interface Listener {
+    interface EventListener {
         fun enqueue(eventRuntimeStore: EventRuntimeStore)
 
         fun interrupt(componentId: String)
     }
 
-    interface Action {
+    interface ComponentListener {
         fun onEnd(componentId: String, rootTaskRunner: TaskRunner<*, *>)
     }
 
@@ -57,7 +57,9 @@ class TaskManager(val action: Action, initData: InitData = InitData.create()) {
     val currentTime: Long
         get() = time
 
-    private val listeners = mutableListOf<Listener>()
+    private val eventListeners = mutableListOf<EventListener>()
+
+    private val componentListeners = mutableMapOf<String, MutableList<ComponentListener>>()
 
     private val factories = mutableMapOf<String, TaskRunnerFactory>()
 
@@ -79,12 +81,21 @@ class TaskManager(val action: Action, initData: InitData = InitData.create()) {
         idManager.reset(initData.resetId)
     }
 
-    fun addTaskListener(listener: Listener) {
-        listeners.add(listener)
+    fun addTaskListener(eventListener: EventListener) {
+        eventListeners.add(eventListener)
     }
 
-    fun removeTaskListener(listener: Listener) {
-        listeners.remove(listener)
+    fun removeTaskListener(eventListener: EventListener) {
+        eventListeners.remove(eventListener)
+    }
+
+    fun addComponentListener(componentId: String, componentListener: ComponentListener) {
+        componentListeners.getOrPut(componentId) { mutableListOf() }
+                .add(componentListener)
+    }
+
+    fun removeComponentListener(componentId: String, componentListener: ComponentListener) {
+        componentListeners[componentId]?.remove(componentListener)
     }
 
     fun registerFactory(factory: TaskRunnerFactory) {
@@ -135,7 +146,7 @@ class TaskManager(val action: Action, initData: InitData = InitData.create()) {
             val current = context.tree[context.currentNodeId]
             checkNotNull(current)
 
-            listeners.fastForEach { it.interrupt(componentId) }
+            eventListeners.fastForEach { it.interrupt(componentId) }
 
             eventsSortedByEndTime.remove(currentEventRunner)
             context.eventRuntimeStores.clear()
@@ -213,7 +224,7 @@ class TaskManager(val action: Action, initData: InitData = InitData.create()) {
             val parent = context.tree[current.parentId]
             if (parent == null) {
                 // 自身がrootであるため処理が終了
-                action.onEnd(componentId, runner)
+                componentListeners[componentId]?.fastForEach { it.onEnd(componentId, runner) }
                 return
             }
 
@@ -235,7 +246,7 @@ class TaskManager(val action: Action, initData: InitData = InitData.create()) {
         }
 
         for (eventRuntimeStore in eventRuntimeStores) {
-            listeners.fastForEach { it.enqueue(eventRuntimeStore) }
+            eventListeners.fastForEach { it.enqueue(eventRuntimeStore) }
 
             if (eventRuntimeStore.endTime() <= time) {
                 endEventRuntimeStore(eventRuntimeStore)

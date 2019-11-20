@@ -43,7 +43,8 @@ class SerializationTest {
         assertNotNull(component1)
 
         var expectIsEnded = false
-        val expectedTaskManager = TaskManager(object : TaskManager.Action {
+        val expectedTaskManager = TaskManager()
+        expectedTaskManager.addComponentListener(component1Id, object : TaskManager.ComponentListener {
             override fun onEnd(componentId: String, rootTaskRunner: TaskRunner<*, *>) {
                 expectIsEnded = true
             }
@@ -61,17 +62,19 @@ class SerializationTest {
 
         var actualIsEnded = false
         val actualInitData = protoBuf.parse(TaskManager.InitData.serializer(), bytes)
-        val actualTaskManager = TaskManager(object : TaskManager.Action {
-            override fun onEnd(componentId: String, rootTaskRunner: TaskRunner<*, *>) {
-                actualIsEnded = true
-            }
-        }, actualInitData)
 
         val component2Id = componentManager.createComponent(component1Store)
         assertNotNull(component2Id)
 
         val component2 = componentManager.findById(component2Id, CustomComponent::class)
         assertNotNull(component2)
+
+        val actualTaskManager = TaskManager(actualInitData)
+        actualTaskManager.addComponentListener(component2Id, object : TaskManager.ComponentListener {
+            override fun onEnd(componentId: String, rootTaskRunner: TaskRunner<*, *>) {
+                actualIsEnded = true
+            }
+        })
 
         actualTaskManager.registerFactory(Custom1TaskRunnerFactory())
 //        actualTaskManager.registerComponent(component2Id)
@@ -94,9 +97,7 @@ class SerializationTest {
         val component1 = componentManager.findById(component1Id, CustomComponent::class)
         assertNotNull(component1)
 
-        val taskManager = TaskManager(object : TaskManager.Action {
-            override fun onEnd(componentId: String, rootTaskRunner: TaskRunner<*, *>) {}
-        })
+        val taskManager = TaskManager()
         taskManager.registerFactory(Custom1TaskRunnerFactory())
         taskManager.registerComponent(component1Id)
 
