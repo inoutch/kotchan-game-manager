@@ -13,4 +13,10 @@ class ComponentAccessor<T : Component> private constructor(val raw: T) {
     inline fun access(scope: (lifecycle: ComponentLifecycle, component: T) -> Unit) {
         scope(raw.lifecycle, raw)
     }
+
+    inline fun accessWhenAlive(scope: (component: T) -> Unit) {
+        if (lifecycle == ComponentLifecycle.CREATE || lifecycle == ComponentLifecycle.UPDATE) {
+            scope(raw)
+        }
+    }
 }
