@@ -125,13 +125,13 @@ class TaskManager(initData: InitData = InitData.create()) {
         contexts.remove(componentId)
     }
 
-    fun run(componentId: String, taskStore: TaskStore) {
+    fun run(componentId: String, taskStore: TaskStore): Boolean {
         val context = contexts[componentId]
         checkNotNull(context) { ERR_V_MSG_6 }
 
         val root = context.tree.add(taskStore)
         context.currentNodeId = root.id
-        run(componentId, context, root)
+        return run(componentId, context, root)
     }
 
     fun interrupt(componentId: String) {
@@ -184,7 +184,7 @@ class TaskManager(initData: InitData = InitData.create()) {
         context: ActionComponentContext,
         root: SerializableNode<TaskStore>,
         startTime: Long = this.time
-    ) {
+    ): Boolean {
         val queue = mutableListOf(root)
 
         while (queue.isNotEmpty()) {
@@ -200,7 +200,7 @@ class TaskManager(initData: InitData = InitData.create()) {
 
             if (eventBuilder.actionStoreQueue.isNotEmpty()) {
                 attachEventRunners(context, componentId, eventBuilder.actionStoreQueue, startTime)
-                return
+                return false
             }
 
             // Task作成フェーズ
@@ -225,7 +225,7 @@ class TaskManager(initData: InitData = InitData.create()) {
             if (parent == null) {
                 // 自身がrootであるため処理が終了
                 componentListeners[componentId]?.fastForEach { it.onEnd(componentId, runner) }
-                return
+                return true
             }
 
             context.tree.removeFromParent(parent.id, 0)
@@ -237,6 +237,7 @@ class TaskManager(initData: InitData = InitData.create()) {
                 queue.add(next)
             }
         }
+        return false
     }
 
     private fun startEventRuntimeStores(): Int {
