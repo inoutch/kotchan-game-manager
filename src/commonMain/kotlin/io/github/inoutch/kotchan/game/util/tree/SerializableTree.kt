@@ -35,6 +35,10 @@ class SerializableTree<T> private constructor(initialNodes: List<SerializableNod
         return nodes[id]
     }
 
+    fun getValue(id: Long): SerializableNode<T> {
+        return nodes.getValue(id)
+    }
+
     fun get(id: Long, childIndex: Int): SerializableNode<T>? {
         return nodesByParent.getValue(id).getOrNull(childIndex)
     }

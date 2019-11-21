@@ -23,7 +23,7 @@ import io.github.inoutch.kotchan.game.util.tree.SerializableTree
 import kotlin.native.concurrent.ThreadLocal
 import kotlinx.serialization.Serializable
 
-class TaskManager(initData: InitData = InitData.create()) {
+class TaskManager(initData: InitData = InitData.create()) : EventManagerListener {
     @ThreadLocal
     companion object {
         val taskRunnerContextProvider = ContextProvider<TaskRunnerContext>()
@@ -70,6 +70,8 @@ class TaskManager(initData: InitData = InitData.create()) {
     private val eventsSortedByStartTime = initData.eventSortedByStartTime.toCollection(ArrayList())
 
     private val eventsSortedByEndTime = initData.eventsSortedByEndTime.toCollection(ArrayList())
+
+    private val cachedTaskRunners = mutableMapOf<TaskStore, TaskRunner<*, *>>()
 
     // -- シリアライズ対象 --
     private val contexts = initData.contexts
@@ -179,6 +181,20 @@ class TaskManager(initData: InitData = InitData.create()) {
                         .toMap())
     }
 
+    override fun start(eventRuntimeStore: EventRuntimeStore) {
+        val context = contexts.getValue(eventRuntimeStore.componentId)
+        val current = context.tree.getValue(context.currentNodeId)
+        val runner = cachedTaskRunners.getValue(current.value)
+        runner.start(eventRuntimeStore)
+    }
+
+    override fun end(eventRuntimeStore: EventRuntimeStore) {
+        val context = contexts.getValue(eventRuntimeStore.componentId)
+        val current = context.tree.getValue(context.currentNodeId)
+        val runner = cachedTaskRunners.getValue(current.value)
+        runner.end(eventRuntimeStore)
+    }
+
     private fun run(
         componentId: String,
         context: ActionComponentContext,
@@ -192,7 +208,8 @@ class TaskManager(initData: InitData = InitData.create()) {
             queue.removeAt(0)
             context.currentNodeId = current.id
 
-            val runner = createTaskRunner(componentId, current.value)
+            val runner = cachedTaskRunners[current.value] ?: createTaskRunner(componentId, current.value)
+                    .also { cachedTaskRunners[current.value] = it }
 
             // Event作成フェーズ
             val eventBuilder = EventBuilder()
@@ -220,6 +237,9 @@ class TaskManager(initData: InitData = InitData.create()) {
                 }
                 continue
             }
+
+            // キャッシュから削除
+            cachedTaskRunners.remove(current.value)
 
             val parent = context.tree[current.parentId]
             if (parent == null) {

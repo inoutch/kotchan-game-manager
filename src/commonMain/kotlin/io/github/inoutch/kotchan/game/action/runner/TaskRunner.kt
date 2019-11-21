@@ -3,6 +3,7 @@ package io.github.inoutch.kotchan.game.action.runner
 import io.github.inoutch.kotchan.game.action.TaskManager.Companion.taskRunnerContextProvider
 import io.github.inoutch.kotchan.game.action.builder.EventBuilder
 import io.github.inoutch.kotchan.game.action.builder.TaskBuilder
+import io.github.inoutch.kotchan.game.action.store.EventRuntimeStore
 import io.github.inoutch.kotchan.game.action.store.TaskStore
 import io.github.inoutch.kotchan.game.component.Component
 import io.github.inoutch.kotchan.game.component.ComponentManager.Companion.componentManager
@@ -31,4 +32,8 @@ abstract class TaskRunner<T : TaskStore, U : Component>(
     abstract fun next(builder: EventBuilder, interrupted: Boolean)
 
     abstract fun next(builder: TaskBuilder, interrupted: Boolean)
+
+    abstract fun start(eventRuntimeStore: EventRuntimeStore)
+
+    abstract fun end(eventRuntimeStore: EventRuntimeStore)
 }

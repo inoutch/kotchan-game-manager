@@ -3,6 +3,7 @@ package io.github.inoutch.kotchan.game.action.custom
 import io.github.inoutch.kotchan.game.action.builder.EventBuilder
 import io.github.inoutch.kotchan.game.action.builder.TaskBuilder
 import io.github.inoutch.kotchan.game.action.runner.TaskRunner
+import io.github.inoutch.kotchan.game.action.store.EventRuntimeStore
 import io.github.inoutch.kotchan.game.test.util.component.CustomComponent
 
 class Custom2TaskRunner : TaskRunner<Custom2TaskStore, CustomComponent>(Custom2TaskStore::class, CustomComponent::class) {
@@ -24,4 +25,8 @@ class Custom2TaskRunner : TaskRunner<Custom2TaskStore, CustomComponent>(Custom2T
             store.currentEventSize = 0
         }
     }
+
+    override fun start(eventRuntimeStore: EventRuntimeStore) {}
+
+    override fun end(eventRuntimeStore: EventRuntimeStore) {}
 }
