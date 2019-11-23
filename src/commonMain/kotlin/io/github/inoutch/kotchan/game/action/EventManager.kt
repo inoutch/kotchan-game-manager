@@ -39,7 +39,7 @@ class EventManager : TaskManager.EventListener {
 
     private var time = 0L
 
-    private val listeners = mutableMapOf<String, MutableList<EventManagerListener>>()
+    private val listeners = mutableListOf<EventManagerListener>()
 
     fun store(): Store {
         return Store((eventsSortedByStartTime + eventsSortedByEndTime).map { it.runtimeStore })
@@ -99,12 +99,12 @@ class EventManager : TaskManager.EventListener {
         factories.clear()
     }
 
-    fun registerListener(componentId: String, listener: EventManagerListener) {
-        listeners.getOrPut(componentId) { mutableListOf() }.add(listener)
+    fun addEventManagerListener(listener: EventManagerListener) {
+        listeners.add(listener)
     }
 
-    fun unregisterListener(componentId: String, listener: EventManagerListener) {
-        listeners[componentId]?.remove(listener)
+    fun removeEventManagerListener(listener: EventManagerListener) {
+        listeners.remove(listener)
     }
 
     private fun endEventRunners(): Int {
@@ -116,7 +116,7 @@ class EventManager : TaskManager.EventListener {
         for (eventRunner in eventRunners) {
             // EventRunnerの終了
             eventRunner.end()
-            listeners[eventRunner.componentId]?.fastForEach { it.end(eventRunner.runtimeStore) }
+            listeners.fastForEach { it.end(eventRunner.runtimeStore) }
 
             if (eventRunner.updatable) {
                 updatableEvents.remove(eventRunner)
@@ -137,12 +137,12 @@ class EventManager : TaskManager.EventListener {
 
             if (!skipOlderEventStarting || time == eventRunner.startTime) {
                 eventRunner.start()
-                listeners[eventRunner.componentId]?.fastForEach { it.start(eventRunner.runtimeStore) }
+                listeners.fastForEach { it.start(eventRunner.runtimeStore) }
             }
 
             if (eventRunner.endTime <= time && exists.size >= 2) {
                 eventRunner.end()
-                listeners[eventRunner.componentId]?.fastForEach { it.end(eventRunner.runtimeStore) }
+                listeners.fastForEach { it.end(eventRunner.runtimeStore) }
                 exists.remove(eventRunner)
                 continue
             }
