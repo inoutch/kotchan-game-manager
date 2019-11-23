@@ -5,7 +5,8 @@ import kotlinx.serialization.Serializable
 // CAUTION: DO NOT USE `type` PROPERTY FOR KOTLIN SERIALIZATION
 @Serializable
 open class Store {
-    open val factoryType: String = ""
+    open val factoryType: String
+        get() = ""
 
     // TODO: Change hash algorithm
     open val id: String
