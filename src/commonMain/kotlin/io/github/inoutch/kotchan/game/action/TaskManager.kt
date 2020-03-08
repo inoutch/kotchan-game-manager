@@ -292,7 +292,7 @@ class TaskManager(initData: InitData = InitData.create()) : EventManagerListener
     }
 
     private fun createTaskRunner(componentId: String, taskStore: TaskStore): TaskRunner<*, *> {
-        val taskRuntimeStore = TaskRuntimeStore(componentId, idManager.nextId(), taskStore)
+        val taskRuntimeStore = TaskRuntimeStore(componentId, idManager.getAndIncrementNextId(), taskStore)
 
         val taskRunnerFactory = factories[taskRuntimeStore.taskStore.factoryClass]
         checkNotNull(taskRunnerFactory) { ERR_F_MSG_4(taskRuntimeStore.taskStore.factoryClass, taskRunnerFactory) }
@@ -307,7 +307,7 @@ class TaskManager(initData: InitData = InitData.create()) : EventManagerListener
         eventStore: EventStore,
         startTime: Long
     ): EventRuntimeStore {
-        return EventRuntimeStore(componentId, idManager.nextId(), startTime, eventStore)
+        return EventRuntimeStore(componentId, idManager.getAndIncrementNextId(), startTime, eventStore)
     }
 
     private fun attachEventRunners(

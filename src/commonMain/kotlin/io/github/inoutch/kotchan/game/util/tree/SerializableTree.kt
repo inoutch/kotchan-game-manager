@@ -52,7 +52,7 @@ class SerializableTree<T> private constructor(initialNodes: List<SerializableNod
 
         var nextId = id
         if (nextId == null) {
-            nextId = idManager.nextId()
+            nextId = idManager.getAndIncrementNextId()
         } else {
             check(nextId >= idManager.nextId) { "Manually added id must set a value greater than the managed id. [Manually id = $nextId, managed id ${idManager.nextId}]" }
             idManager.reset(nextId)
